@@ -10,8 +10,8 @@ let clickTimes = [];
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
 
 // DataPipe configuration - REPLACE WITH YOUR ACTUAL VALUES
-const DATAPIPE_ENDPOINT = 'https://osf.io/va8xm/';
-const OSF_PROJECT_ID = '6sUXv8MJL3e6'; // Replace with your OSF project ID
+const DATAPIPE_ENDPOINT = 'https://pipe.jspsych.org/api/data/';
+const OSF_PROJECT_ID = 'va8xm'; // Replace with your OSF project ID
 
 // Initialize jsPsych
 const jsPsych = initJsPsych({
@@ -181,6 +181,7 @@ function createWordRevealTrial(trialIndex) {
             document.getElementById('guess-btn').addEventListener('click', function() {
                 jsPsych.finishTrial({
                     trial_number: trialNumber,
+                    trial_type: 'word-reveal',
                     sentence_id: trial.sentence_id || trialNumber,
                     target_word_index: targetIndex,
                     target_word: trial.target_word,
@@ -220,6 +221,7 @@ function createGuessInputTrial(trialIndex) {
         on_finish: function(data) {
             // Store comprehensive trial information
             data.trial_number = trialNumber;
+            data.trial_type = 'guess-input'
             data.sentence_id = trial.sentence_id || trialNumber;
             data.correct_target_word = trial.target_word;
             data.target_word_index = trial.target_word_index;
