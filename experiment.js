@@ -10,7 +10,10 @@ let clickTimes = [];
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
 
 // Initialize filename based on workerId
-const filename = `${workerId}.csv`;
+
+const subject_id = jsPsych.randomization.randomID(10);
+const filename = `${subject_id}.csv`;
+            
 
 // Initialize jsPsych (remove the old sendDataToOSF call)
 const jsPsych = initJsPsych({
