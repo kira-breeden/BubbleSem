@@ -1,0 +1,6 @@
+﻿trial_number,ground_truth_sentence,nonsense_sentence,target_word_index,target_word
+1,"The scoby floats at the top of the jar of kombucha.","The gharp phrevs at the chelp of the chusp of smeighth.",2,scoby
+2,"I have some eyedrops if you need them. Not the medicated kind, just the moisturizing kind.","I have some siefs if you swoosh them . Not the sprassed freem , just the thowl freem .",3,eyedrops
+3,"The dog barked loudly at the mailman.","The screck splunked geke at the staught.",2,barked
+4,"The wine needed to age in the barrels for over a century.","The smaith thworseed to flurr in the freems for over a fliff.",7,barrels
+5,"The cloud moved across the sky.","The shrazz fysed sheuth the chaun.",5,sky
