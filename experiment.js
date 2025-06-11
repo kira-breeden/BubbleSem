@@ -9,16 +9,18 @@ let clickTimes = [];
 // Articles that should not be obscured
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
 
-// Initialize filename based on workerId
 
-const subject_id = jsPsych.randomization.randomID(10);
-const filename = `${subject_id}.csv`;
             
 
 // Initialize jsPsych (remove the old sendDataToOSF call)
 const jsPsych = initJsPsych({
     // Remove the old on_finish function since we'll handle saving differently
 });
+
+// Initialize filename based on workerId
+
+const subject_id = jsPsych.randomization.randomID(10);
+const filename = `${subject_id}.csv`;
 
 // Function to load CSV data
 function loadTrialData() {
