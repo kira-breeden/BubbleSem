@@ -9,63 +9,30 @@ let clickTimes = [];
 // Articles that should not be obscured
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
 
-// DataPipe configuration - REPLACE WITH YOUR ACTUAL VALUES
-const DATAPIPE_ENDPOINT = 'https://pipe.jspsych.org/api/data/';
-const OSF_PROJECT_ID = 'va8xm'; // Replace with your OSF project ID
+// Initialize filename based on workerId
+const filename = `${workerId}.csv`;
 
-// Initialize jsPsych
+// Initialize jsPsych (remove the old sendDataToOSF call)
 const jsPsych = initJsPsych({
-    on_finish: function() {
-        // Send data to DataPipe/OSF
-        sendDataToOSF();
-    }
+    // Remove the old on_finish function since we'll handle saving differently
 });
 
 // Function to load CSV data
 function loadTrialData() {
     return new Promise((resolve, reject) => {
-        // For demo purposes, using sample data that matches your CSV structure
-        // Replace this with your actual CSV loading
-        // const sampleData = [
-        //     {
-        //         trial_number: 1,  // or however you name this column
-        //         ground_truth_sentence: "the cat jumped a fence in the yard",
-        //         nonsense_sentence: "the blork snerfed a gribble in the flump", 
-        //         target_word_index: 6, // 0-indexed position of target word
-        //         target_word: "yard"   // the actual target word string
-        //     },
-        //     {
-        //         trial_number: 2,
-        //         ground_truth_sentence: "a student opened the book with pages",
-        //         nonsense_sentence: "a wibble flonked the zorb with blargs",
-        //         target_word_index: 5,
-        //         target_word: "pages"
-        //     }
-        // ];
-        
-        // trialData = sampleData;
-        // resolve();
-        
-        // TO USE YOUR CSV FILE: 
-        // 1. Replace 'trials.csv' with your actual CSV file path
-        // 2. Make sure your CSV headers match the expected column names
-        // 3. Uncomment the code below and comment out the sampleData above
-        
         Papa.parse('trial_list_test.csv', {
             download: true,
             header: true,
             skipEmptyLines: true,
-            dynamicTyping: true, // Automatically convert numbers
+            dynamicTyping: true,
             complete: function(results) {
                 console.log('Loaded CSV data:', results.data);
                 
-                // Validate the data structure
                 if (results.data.length === 0) {
                     reject(new Error('CSV file is empty'));
                     return;
                 }
                 
-                // Check for required columns
                 const requiredColumns = ['ground_truth_sentence', 'nonsense_sentence', 'target_word_index', 'target_word'];
                 const firstRow = results.data[0];
                 const missingColumns = requiredColumns.filter(col => !(col in firstRow));
@@ -90,7 +57,6 @@ function loadTrialData() {
 // Function to create word reveal trial
 function createWordRevealTrial(trialIndex) {
     const trial = trialData[trialIndex];
-    // Use whatever column names your CSV has - adjust these as needed:
     const nonsenseWords = trial.nonsense_sentence.split(' ');
     const realWords = (trial.ground_truth_sentence || trial.real_sentence).split(' ');
     const targetIndex = parseInt(trial.target_word_index);
@@ -130,14 +96,11 @@ function createWordRevealTrial(trialIndex) {
                 let wordText = word;
                 
                 if (index === targetIndex) {
-                    // This is the target word - make it bold and non-clickable
                     wordClass += ' target';
                 } else if (articles.includes(word.toLowerCase().replace(/[.,!?]/g, ''))) {
-                    // This is an article - show the real word and make it non-clickable
                     wordClass += ' article';
                     wordText = realWords[index];
                 } else {
-                    // This is a regular word that can be clicked to reveal
                     wordClass += ' clickable';
                 }
                 
@@ -156,7 +119,6 @@ function createWordRevealTrial(trialIndex) {
         choices: ['Make Guess'],
         button_html: '<button class="jspsych-btn" style="display: none;">%choice%</button>',
         on_load: function() {
-            // Add click listeners to clickable words only
             const words = document.querySelectorAll('.word.clickable');
             words.forEach(word => {
                 word.addEventListener('click', function() {
@@ -169,7 +131,6 @@ function createWordRevealTrial(trialIndex) {
                             time_from_start: Date.now() - startTime
                         });
                         
-                        // Reveal the word
                         this.textContent = realWords[index];
                         this.classList.remove('clickable');
                         this.classList.add('revealed');
@@ -177,11 +138,10 @@ function createWordRevealTrial(trialIndex) {
                 });
             });
             
-            // Add click listener to guess button
             document.getElementById('guess-btn').addEventListener('click', function() {
                 jsPsych.finishTrial({
-                    trial_number: trialNumber,
                     trial_type: 'word-reveal',
+                    trial_number: trialNumber,
                     sentence_id: trial.sentence_id || trialNumber,
                     target_word_index: targetIndex,
                     target_word: trial.target_word,
@@ -219,50 +179,22 @@ function createGuessInputTrial(trialIndex) {
             }
         ],
         on_finish: function(data) {
-            // Store comprehensive trial information
+            data.trial_type = 'guess-input';
             data.trial_number = trialNumber;
-            data.trial_type = 'guess-input'
             data.sentence_id = trial.sentence_id || trialNumber;
             data.correct_target_word = trial.target_word;
             data.target_word_index = trial.target_word_index;
             data.nonsense_sentence = trial.nonsense_sentence;
             data.ground_truth_sentence = trial.ground_truth_sentence || trial.real_sentence;
             
-            // Check if guess is correct (case-insensitive, remove punctuation)
             const guess = data.response.target_word_guess.toLowerCase().trim().replace(/[.,!?]/g, '');
             const correct = trial.target_word.toLowerCase().trim().replace(/[.,!?]/g, '');
             data.guess_correct = guess === correct;
             
-            // Store additional useful info
             data.guess_length = data.response.target_word_guess.length;
             data.target_word_length = trial.target_word.length;
         }
     };
-}
-
-// Function to send data to OSF via DataPipe
-function sendDataToOSF() {
-    const data = jsPsych.data.get().json();
-    
-    fetch(DATAPIPE_ENDPOINT, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            experimentID: OSF_PROJECT_ID,
-            filename: `word_reveal_${Date.now()}.json`,
-            data: data
-        })
-    }).then(response => {
-        if (response.ok) {
-            console.log('Data sent successfully to OSF');
-        } else {
-            console.error('Failed to send data to OSF');
-        }
-    }).catch(error => {
-        console.error('Error sending data to OSF:', error);
-    });
 }
 
 // Welcome screen
@@ -316,6 +248,17 @@ async function createTimeline() {
         timeline.push(createGuessInputTrial(i));
     }
     
+    // Add data saving trial using jsPsychPipe
+    const save_data = {
+        type: jsPsychPipe,
+        action: "save",
+        experiment_id: "MNeCPpLJh3wg", // Your experiment ID
+        filename: filename,
+        data_string: () => jsPsych.data.get().csv()
+    };
+    
+    timeline.push(save_data);
+    
     // Thank you message
     timeline.push({
         type: jsPsychHtmlKeyboardResponse,
@@ -328,7 +271,6 @@ async function createTimeline() {
             </div>
         `,
         on_finish: function() {
-            // Final data processing
             jsPsych.data.addProperties({
                 experiment_version: '1.0',
                 completion_time: new Date().toISOString()
