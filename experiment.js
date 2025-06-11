@@ -10,8 +10,8 @@ let clickTimes = [];
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
 
 // DataPipe configuration - REPLACE WITH YOUR ACTUAL VALUES
-const DATAPIPE_ENDPOINT = 'https://pipe.jspsych.org/api/data/';
-const OSF_PROJECT_ID = 'your-osf-project-id'; // Replace with your OSF project ID
+const DATAPIPE_ENDPOINT = 'https://osf.io/va8xm/';
+const OSF_PROJECT_ID = '6sUXv8MJL3e6'; // Replace with your OSF project ID
 
 // Initialize jsPsych
 const jsPsych = initJsPsych({
