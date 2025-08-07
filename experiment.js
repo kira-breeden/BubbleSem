@@ -235,7 +235,6 @@ const instructions = {
                 <li>When you think you know the bolded word, click "Make Guess"</li>
                 <li>Type your guess for the bolded word</li>
             </ol>
-            <p>Strategy tip: Reveal words that might give you context clues about the bolded word!</p>
             <p><em>Press any key to start</em></p>
         </div>
     `
