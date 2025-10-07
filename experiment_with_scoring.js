@@ -235,6 +235,43 @@ function createGuessInputTrial(trialIndex) {
     };
 }
 
+// Consent // uncomment if running online
+
+// // Updated LupyanLab consent (up to date as of June 2025)
+// const consent = {
+//     type: jsPsychHtmlButtonResponse,
+//     stimulus: `
+//         <div style="width: 800px; margin: 0 auto; text-align: left">
+//             <h3>Consent to Participate in Research</h3>
+            
+//             <p>The task you are about to do is sponsored by University of Wisconsin-Madison. It is part of a protocol titled "What are we learning from language?"</p>
+
+//             <p>The task you are asked to do involves making simple responses to words and sentences. For example, you may be asked to rate a pair of words on their similarity or to indicate how true you think a given sentence is. More detailed instructions for this specific task will be provided on the next screen.</p>
+
+//             <p>This task has no direct benefits. We do not anticipate any psychosocial risks. There is a risk of a confidentiality breach. Participants may become fatigued or frustrated due to the length of the study.</p>
+
+//             <p>The responses you submit as part of this task will be stored on a sercure server and accessible only to researchers who have been approved by UW-Madison. Processed data with all identifiers removed could be used for future research studies or distributed to another investigator for future research studies without additional informed consent from the subject or the legally authorized representative.</p>
+
+//             <p>You are free to decline to participate, to end participation at any time for any reason, or to refuse to answer any individual question without penalty or loss of earned compensation. We will not retain data from partial responses. If you would like to withdraw your data after participating, you may send an email lupyan@wisc.edu or complete this form which will allow you to make a request anonymously.</p>
+
+//             <p>If you have any questions or concerns about this task please contact the principal investigator: Prof. Gary Lupyan at lupyan@wisc.edu.</p>
+
+//             <p>If you are not satisfied with response of the research team, have more questions, or want to talk with someone about your rights as a research participant, you should contact University of Wisconsin's Education Research and Social & Behavioral Science IRB Office at 608-263-2320.</p>
+
+//             <p><strong>By clicking the box below, I consent to participate in this task and affirm that I am at least 18 years old.</strong></p>
+//         </div>
+//     `,
+//     choices: ['I Agree', 'I Do Not Agree'],
+//     data: {
+//         trial_type: 'consent'
+//     },
+//     on_finish: function(data) {
+//         if(data.response == 1) {
+//             jsPsych.endExperiment('Thank you for your time. The experiment has been ended.');
+//         }
+//     }
+// };
+
 // Welcome screen
 const welcome = {
     type: jsPsychHtmlKeyboardResponse,
@@ -275,11 +312,33 @@ const instructions = {
     `
 };
 
+// Debreif
+const post_study = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+        <div style="max-width: 600px; margin: 0 auto; text-align: left;">
+            <h2>Instructions</h2>
+            <p>On each trial:</p>
+            <ol>
+                <li>You'll see a sentence with nonsense words</li>
+                <li>One word will be <strong>bolded</strong> - this is your target word to guess</li>
+                <li>Click on other words to reveal their true meaning (<strong>${POINTS_PER_REVEAL} points each</strong>)</li>
+                <li>When you think you know the bolded word, click "Make Guess"</li>
+                <li>Type your guess for the bolded word</li>
+            </ol>
+            <p><strong>Remember:</strong> You start with 100 points. Your goal is to keep as many points as possible!</p>
+            <p><em>Press any key to start</em></p>
+        </div>
+    `
+};
+
 // Create timeline
 async function createTimeline() {
     await loadTrialData();
     
     let timeline = [welcome, instructions];
+    // let timeline = [consent, welcome, instructions]; // uncomment if running online
+
     
     // Add trials for each sentence
     for (let i = 0; i < trialData.length; i++) {
@@ -287,6 +346,8 @@ async function createTimeline() {
         timeline.push(createGuessInputTrial(i));
     }
     
+
+
     // Capture final score before data saving
     let finalScore = 0;
     
@@ -323,7 +384,7 @@ async function createTimeline() {
             console.log('Final points when displaying:', finalScore); // Debug log
             return `
                 <div style="text-align: center;">
-                    <h2>Thank you!</h2>
+                    <h2>Thank you and great job!</h2>
                     <p>You have completed the experiment.</p>
                     <p><strong>Final Score: ${finalScore} points</strong></p>
                     <p>Your data has been saved.</p>
