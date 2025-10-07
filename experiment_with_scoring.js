@@ -301,15 +301,17 @@ async function createTimeline() {
     // Thank you message with final score
     timeline.push({
         type: jsPsychHtmlKeyboardResponse,
-        stimulus: `
-            <div style="text-align: center;">
-                <h2>Thank you!</h2>
-                <p>You have completed the experiment.</p>
-                <p><strong>Final Score: ${totalPoints} points</strong></p>
-                <p>Your data has been saved.</p>
-                <p>Press any key to finish.</p>
-            </div>
-        `,
+        stimulus: function() {
+            return `
+                <div style="text-align: center;">
+                    <h2>Thank you!</h2>
+                    <p>You have completed the experiment.</p>
+                    <p><strong>Final Score: ${totalPoints} points</strong></p>
+                    <p>Your data has been saved.</p>
+                    <p>Press any key to finish.</p>
+                </div>
+            `;
+        },
         on_finish: function() {
             jsPsych.data.addProperties({
                 experiment_version: '1.0',
