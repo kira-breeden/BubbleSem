@@ -287,6 +287,24 @@ async function createTimeline() {
         timeline.push(createGuessInputTrial(i));
     }
     
+    // Capture final score before data saving
+    let finalScore = 0;
+    
+    timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '',
+        trial_duration: 1,
+        on_start: function() {
+            finalScore = totalPoints;
+            console.log('Captured final score:', finalScore);
+            jsPsych.data.addProperties({
+                experiment_version: '1.0',
+                completion_time: new Date().toISOString(),
+                final_score: finalScore
+            });
+        }
+    });
+    
     // Add data saving trial using jsPsychPipe
     const save_data = {
         type: jsPsychPipe,
@@ -302,22 +320,16 @@ async function createTimeline() {
     timeline.push({
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function() {
+            console.log('Final points when displaying:', finalScore); // Debug log
             return `
                 <div style="text-align: center;">
                     <h2>Thank you!</h2>
                     <p>You have completed the experiment.</p>
-                    <p><strong>Final Score: ${totalPoints} points</strong></p>
+                    <p><strong>Final Score: ${finalScore} points</strong></p>
                     <p>Your data has been saved.</p>
                     <p>Press any key to finish.</p>
                 </div>
             `;
-        },
-        on_finish: function() {
-            jsPsych.data.addProperties({
-                experiment_version: '1.0',
-                completion_time: new Date().toISOString(),
-                final_score: totalPoints
-            });
         }
     });
     
