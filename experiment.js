@@ -40,7 +40,6 @@ class SeededRandom {
 }
 
 // Determine which sublist to use based on URL parameter
-// Default to sublist 1 if no parameter or invalid parameter
 const sublistParam = getURLParameter('sublist');
 let sublistNumber = 1; // default
 
@@ -78,55 +77,6 @@ const jsPsych = initJsPsych({});
 const subject_id = jsPsych.randomization.randomID(10);
 const filename = `${subject_id}_sublist${sublistNumber}_seed${randomSeed}.csv`;
 
-// Function to load and randomize CSV data
-function loadTrialData() {
-    return new Promise((resolve, reject) => {
-        Papa.parse(csvFilename, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            dynamicTyping: true,
-            complete: function(results) {
-                console.log('Loaded CSV data:', results.data);
-                
-                if (results.data.length === 0) {
-                    reject(new Error('CSV file is empty'));
-                    return;
-                }
-                
-                const requiredColumns = ['passage_variant', 'jabber_passage', 'target_pos', 'target_word'];
-                const firstRow = results.data[0];
-                const missingColumns = requiredColumns.filter(col => !(col in firstRow));
-                
-                if (missingColumns.length > 0) {
-                    reject(new Error(`Missing required columns: ${missingColumns.join(', ')}`));
-                    return;
-                }
-                
-                // Store original data
-                const originalData = results.data;
-                
-                // Randomize trial order using seeded random
-                const rng = new SeededRandom(randomSeed);
-                trialData = rng.shuffle(originalData);
-                
-                console.log(`Successfully loaded ${trialData.length} trials from sublist ${sublistNumber}`);
-                console.log(`Randomized with seed ${randomSeed}`);
-                
-                // Log first few trial numbers to verify randomization
-                console.log('Randomized trial order (first 5):', 
-                    trialData.slice(0, 5).map(t => t.trial_number || 'N/A'));
-                
-                resolve();
-            },
-            error: function(error) {
-                console.error('Error loading CSV:', error);
-                reject(error);
-            }
-        });
-    });
-}
-
 // Function to parse word_to_nonce mapping
 function parseWordToNonce(trial) {
     let mapping = {};
@@ -147,6 +97,74 @@ function parseWordToNonce(trial) {
     return mapping;
 }
 
+// Function to find target word index in sentence
+function findTargetWordIndex(words, targetWord, targetPos) {
+    // If targetPos is a number, use it directly
+    if (typeof targetPos === 'number' && targetPos >= 0 && targetPos < words.length) {
+        return targetPos;
+    }
+    
+    // Otherwise, search for the target word
+    for (let i = 0; i < words.length; i++) {
+        const cleanWord = words[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
+        const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
+        if (cleanWord === cleanTarget) {
+            return i;
+        }
+    }
+    
+    console.error(`Could not find target word '${targetWord}' in sentence`);
+    return -1;
+}
+
+// Function to load and randomize CSV data
+function loadTrialData() {
+    return new Promise((resolve, reject) => {
+        Papa.parse(csvFilename, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            dynamicTyping: true,
+            complete: function(results) {
+                console.log('Loaded CSV data:', results.data);
+                
+                if (results.data.length === 0) {
+                    reject(new Error('CSV file is empty'));
+                    return;
+                }
+                
+                const requiredColumns = ['passage_variant', 'jabber_passage', 'target_word'];
+                const firstRow = results.data[0];
+                const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+                
+                if (missingColumns.length > 0) {
+                    reject(new Error(`Missing required columns: ${missingColumns.join(', ')}`));
+                    return;
+                }
+                
+                // Store original data
+                const originalData = results.data;
+                
+                // Randomize trial order using seeded random
+                const rng = new SeededRandom(randomSeed);
+                trialData = rng.shuffle(originalData);
+                
+                console.log(`Successfully loaded ${trialData.length} trials from sublist ${sublistNumber}`);
+                console.log(`Randomized with seed ${randomSeed}`);
+                
+                // Log first few for debugging
+                console.log('First trial structure:', trialData[0]);
+                
+                resolve();
+            },
+            error: function(error) {
+                console.error('Error loading CSV:', error);
+                reject(error);
+            }
+        });
+    });
+}
+
 // Function to create word reveal trial
 function createWordRevealTrial(trialIndex) {
     const trial = trialData[trialIndex];
@@ -158,20 +176,10 @@ function createWordRevealTrial(trialIndex) {
     const realWords = realSentence.split(' ');
     const jabberWords = jabberSentence.split(' ');
     
-    // Get target position - handle both 'target_pos' and 'target_word_index'
+    // Get target word and find its position
+    const targetWord = trial.target_word;
     const targetPos = trial.target_pos || trial.target_word_index;
-    
-    // Parse target position if it's a string like "noun" or a number
-    let targetIndex;
-    if (typeof targetPos === 'number') {
-        targetIndex = targetPos;
-    } else if (typeof targetPos === 'string') {
-        // If it's a word like "noun", try to find the target word
-        const targetWord = trial.target_word;
-        targetIndex = realWords.findIndex(word => 
-            word.toLowerCase().replace(/[.,!?;:]/g, '') === targetWord.toLowerCase()
-        );
-    }
+    const targetIndex = findTargetWordIndex(realWords, targetWord, targetPos);
     
     const trialNumber = trialIndex + 1; // Use position in randomized order
     const originalTrialNumber = trial.trial_number || trialNumber;
@@ -179,9 +187,25 @@ function createWordRevealTrial(trialIndex) {
     // Get word-to-nonce mapping
     const wordToNonce = parseWordToNonce(trial);
     
+    // Debug logging
+    console.log(`Trial ${trialNumber}:`, {
+        targetWord,
+        targetPos,
+        targetIndex,
+        realWordsCount: realWords.length,
+        jabberWordsCount: jabberWords.length,
+        targetInReal: realWords[targetIndex],
+        targetInJabber: jabberWords[targetIndex]
+    });
+    
     // Validation
     if (targetIndex < 0 || targetIndex >= realWords.length) {
-        console.error(`Invalid target_pos ${targetPos} for trial ${originalTrialNumber}`);
+        console.error(`Invalid target index ${targetIndex} for trial ${originalTrialNumber}`);
+    }
+    
+    // Verify word counts match
+    if (realWords.length !== jabberWords.length) {
+        console.warn(`Word count mismatch: real=${realWords.length}, jabber=${jabberWords.length}`);
     }
     
     return {
@@ -201,23 +225,35 @@ function createWordRevealTrial(trialIndex) {
                 <div class="sentence-container" id="sentence-container">
             `;
             
-            jabberWords.forEach((word, index) => {
+            // Build sentence word by word
+            for (let index = 0; index < jabberWords.length; index++) {
                 let wordClass = 'word';
-                let wordText = word;
+                let displayWord = jabberWords[index];
+                
+                // Clean word for comparison (remove punctuation)
+                const cleanJabber = jabberWords[index].toLowerCase().replace(/[.,!?;:'"]/g, '');
+                const cleanReal = index < realWords.length ? realWords[index].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
                 
                 if (index === targetIndex) {
+                    // This is the target word - keep it as jabberwocky and make it bold
                     wordClass += ' target';
-                    // Keep the jabberwocky version for target - don't reveal it!
-                    wordText = jabberWords[index];
-                } else if (articles.includes(word.toLowerCase().replace(/[.,!?]/g, ''))) {
+                    displayWord = jabberWords[index];
+                } else if (articles.includes(cleanJabber) || articles.includes(cleanReal)) {
+                    // This is an article - show the real word
                     wordClass += ' article';
-                    wordText = realWords[index];
+                    displayWord = realWords[index];
+                } else if (cleanJabber === cleanReal) {
+                    // Word is the same in both (likely punctuation or article) - show real
+                    wordClass += ' article';
+                    displayWord = realWords[index];
                 } else {
+                    // Regular word - can be clicked to reveal
                     wordClass += ' clickable';
+                    displayWord = jabberWords[index];
                 }
                 
-                html += `<span class="${wordClass}" data-index="${index}">${wordText}</span>`;
-            });
+                html += `<span class="${wordClass}" data-index="${index}">${displayWord}</span>`;
+            }
             
             html += `
                 </div>
@@ -262,7 +298,8 @@ function createWordRevealTrial(trialIndex) {
                     target_word: trial.target_word,
                     entropy: trial.entropy,
                     target_probability: trial.target_probability,
-                    revealed_words: Array.from(revealedWords),
+                    revealed_words: Array.from(revealedWords).map(idx => realWords[idx]),
+                    revealed_word_indices: Array.from(revealedWords),
                     click_times: clickTimes,
                     total_time_before_guess: Date.now() - startTime,
                     num_words_revealed: revealedWords.size,
