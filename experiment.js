@@ -207,8 +207,8 @@ function createWordRevealTrial(trialIndex) {
                 
                 if (index === targetIndex) {
                     wordClass += ' target';
-                    // Show the real word for target
-                    wordText = realWords[index];
+                    // Keep the jabberwocky version for target - don't reveal it!
+                    wordText = jabberWords[index];
                 } else if (articles.includes(word.toLowerCase().replace(/[.,!?]/g, ''))) {
                     wordClass += ' article';
                     wordText = realWords[index];
