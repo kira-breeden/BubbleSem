@@ -5,27 +5,83 @@ let currentTrial = null;
 let revealedWords = new Set();
 let startTime = null;
 let clickTimes = [];
+let randomSeed = null;
 
 // Articles that should not be obscured
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
 
+// Get URL parameters
+function getURLParameter(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
 
-            
+// Seeded random number generator (for reproducible randomization)
+class SeededRandom {
+    constructor(seed) {
+        this.seed = seed;
+    }
+    
+    // Linear congruential generator
+    next() {
+        this.seed = (this.seed * 9301 + 49297) % 233280;
+        return this.seed / 233280;
+    }
+    
+    // Shuffle array using Fisher-Yates with seeded random
+    shuffle(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(this.next() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+}
 
-// Initialize jsPsych (remove the old sendDataToOSF call)
-const jsPsych = initJsPsych({
-    // Remove the old on_finish function since we'll handle saving differently
-});
+// Determine which sublist to use based on URL parameter
+// Default to sublist 1 if no parameter or invalid parameter
+const sublistParam = getURLParameter('sublist');
+let sublistNumber = 1; // default
 
-// Initialize filename based on workerId
+if (sublistParam) {
+    const parsed = parseInt(sublistParam);
+    if (parsed >= 1 && parsed <= 4) {
+        sublistNumber = parsed;
+    } else {
+        console.warn(`Invalid sublist parameter: ${sublistParam}. Using default sublist 1.`);
+    }
+}
 
+// Get random seed from URL parameter (for trial randomization)
+const seedParam = getURLParameter('seed');
+if (seedParam) {
+    randomSeed = parseInt(seedParam);
+    if (isNaN(randomSeed)) {
+        // If seed is not a number, convert string to number
+        randomSeed = seedParam.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    }
+} else {
+    // Generate random seed if not provided
+    randomSeed = Math.floor(Math.random() * 1000000);
+}
+
+console.log(`Using sublist: ${sublistNumber}`);
+console.log(`Using random seed: ${randomSeed}`);
+
+const csvFilename = `trial_list_sublist_${sublistNumber}.csv`;
+
+// Initialize jsPsych
+const jsPsych = initJsPsych({});
+
+// Initialize filename based on workerId, sublist, and seed
 const subject_id = jsPsych.randomization.randomID(10);
-const filename = `${subject_id}.csv`;
+const filename = `${subject_id}_sublist${sublistNumber}_seed${randomSeed}.csv`;
 
-// Function to load CSV data
+// Function to load and randomize CSV data
 function loadTrialData() {
     return new Promise((resolve, reject) => {
-        Papa.parse('trial_list_test.csv', {
+        Papa.parse(csvFilename, {
             download: true,
             header: true,
             skipEmptyLines: true,
@@ -38,7 +94,7 @@ function loadTrialData() {
                     return;
                 }
                 
-                const requiredColumns = ['ground_truth_sentence', 'nonsense_sentence', 'target_word_index', 'target_word'];
+                const requiredColumns = ['passage_variant', 'jabber_passage', 'target_pos', 'target_word'];
                 const firstRow = results.data[0];
                 const missingColumns = requiredColumns.filter(col => !(col in firstRow));
                 
@@ -47,8 +103,20 @@ function loadTrialData() {
                     return;
                 }
                 
-                trialData = results.data;
-                console.log(`Successfully loaded ${trialData.length} trials`);
+                // Store original data
+                const originalData = results.data;
+                
+                // Randomize trial order using seeded random
+                const rng = new SeededRandom(randomSeed);
+                trialData = rng.shuffle(originalData);
+                
+                console.log(`Successfully loaded ${trialData.length} trials from sublist ${sublistNumber}`);
+                console.log(`Randomized with seed ${randomSeed}`);
+                
+                // Log first few trial numbers to verify randomization
+                console.log('Randomized trial order (first 5):', 
+                    trialData.slice(0, 5).map(t => t.trial_number || 'N/A'));
+                
                 resolve();
             },
             error: function(error) {
@@ -59,24 +127,61 @@ function loadTrialData() {
     });
 }
 
+// Function to parse word_to_nonce mapping
+function parseWordToNonce(trial) {
+    let mapping = {};
+    
+    if (trial.word_to_nonce) {
+        try {
+            // Handle both JSON string and object
+            if (typeof trial.word_to_nonce === 'string') {
+                mapping = JSON.parse(trial.word_to_nonce);
+            } else {
+                mapping = trial.word_to_nonce;
+            }
+        } catch (e) {
+            console.warn('Could not parse word_to_nonce:', e);
+        }
+    }
+    
+    return mapping;
+}
+
 // Function to create word reveal trial
 function createWordRevealTrial(trialIndex) {
     const trial = trialData[trialIndex];
-    const nonsenseWords = trial.nonsense_sentence.split(' ');
-    const realWords = (trial.ground_truth_sentence || trial.real_sentence).split(' ');
-    const targetIndex = parseInt(trial.target_word_index);
-    const trialNumber = trial.trial_number || trial.sentence_id || (trialIndex + 1);
     
-    // Validation: Check that target_word_index makes sense
-    if (targetIndex < 0 || targetIndex >= nonsenseWords.length) {
-        console.error(`Invalid target_word_index ${targetIndex} for trial ${trialNumber}`);
+    // Parse the passages
+    const realSentence = trial.passage_variant || trial.ground_truth_sentence || '';
+    const jabberSentence = trial.jabber_passage || trial.nonsense_sentence || '';
+    
+    const realWords = realSentence.split(' ');
+    const jabberWords = jabberSentence.split(' ');
+    
+    // Get target position - handle both 'target_pos' and 'target_word_index'
+    const targetPos = trial.target_pos || trial.target_word_index;
+    
+    // Parse target position if it's a string like "noun" or a number
+    let targetIndex;
+    if (typeof targetPos === 'number') {
+        targetIndex = targetPos;
+    } else if (typeof targetPos === 'string') {
+        // If it's a word like "noun", try to find the target word
+        const targetWord = trial.target_word;
+        targetIndex = realWords.findIndex(word => 
+            word.toLowerCase().replace(/[.,!?;:]/g, '') === targetWord.toLowerCase()
+        );
     }
     
-    // Validation: Check that the target word matches
-    const expectedTargetWord = realWords[targetIndex];
-    if (expectedTargetWord && expectedTargetWord.toLowerCase().replace(/[.,!?]/g, '') !== 
-        trial.target_word.toLowerCase().replace(/[.,!?]/g, '')) {
-        console.warn(`Target word mismatch in trial ${trialNumber}: expected "${expectedTargetWord}", got "${trial.target_word}"`);
+    const trialNumber = trialIndex + 1; // Use position in randomized order
+    const originalTrialNumber = trial.trial_number || trialNumber;
+    
+    // Get word-to-nonce mapping
+    const wordToNonce = parseWordToNonce(trial);
+    
+    // Validation
+    if (targetIndex < 0 || targetIndex >= realWords.length) {
+        console.error(`Invalid target_pos ${targetPos} for trial ${originalTrialNumber}`);
     }
     
     return {
@@ -96,12 +201,14 @@ function createWordRevealTrial(trialIndex) {
                 <div class="sentence-container" id="sentence-container">
             `;
             
-            nonsenseWords.forEach((word, index) => {
+            jabberWords.forEach((word, index) => {
                 let wordClass = 'word';
                 let wordText = word;
                 
                 if (index === targetIndex) {
                     wordClass += ' target';
+                    // Show the real word for target
+                    wordText = realWords[index];
                 } else if (articles.includes(word.toLowerCase().replace(/[.,!?]/g, ''))) {
                     wordClass += ' article';
                     wordText = realWords[index];
@@ -147,15 +254,20 @@ function createWordRevealTrial(trialIndex) {
                 jsPsych.finishTrial({
                     trial_type: 'word-reveal',
                     trial_number: trialNumber,
-                    sentence_id: trial.sentence_id || trialNumber,
+                    original_trial_number: originalTrialNumber,
+                    randomization_position: trialIndex + 1,
+                    sublist: sublistNumber,
+                    random_seed: randomSeed,
                     target_word_index: targetIndex,
                     target_word: trial.target_word,
+                    entropy: trial.entropy,
+                    target_probability: trial.target_probability,
                     revealed_words: Array.from(revealedWords),
                     click_times: clickTimes,
                     total_time_before_guess: Date.now() - startTime,
                     num_words_revealed: revealedWords.size,
-                    nonsense_sentence: trial.nonsense_sentence,
-                    ground_truth_sentence: realWords.join(' ')
+                    jabber_sentence: jabberSentence,
+                    real_sentence: realSentence
                 });
             });
         },
@@ -167,7 +279,8 @@ function createWordRevealTrial(trialIndex) {
 // Function to create guess input trial
 function createGuessInputTrial(trialIndex) {
     const trial = trialData[trialIndex];
-    const trialNumber = trial.trial_number || trial.sentence_id || (trialIndex + 1);
+    const trialNumber = trialIndex + 1;
+    const originalTrialNumber = trial.trial_number || trialNumber;
     
     return {
         type: jsPsychSurveyText,
@@ -186,11 +299,16 @@ function createGuessInputTrial(trialIndex) {
         on_finish: function(data) {
             data.trial_type = 'guess-input';
             data.trial_number = trialNumber;
-            data.sentence_id = trial.sentence_id || trialNumber;
+            data.original_trial_number = originalTrialNumber;
+            data.randomization_position = trialIndex + 1;
+            data.sublist = sublistNumber;
+            data.random_seed = randomSeed;
             data.correct_target_word = trial.target_word;
-            data.target_word_index = trial.target_word_index;
-            data.nonsense_sentence = trial.nonsense_sentence;
-            data.ground_truth_sentence = trial.ground_truth_sentence || trial.real_sentence;
+            data.target_word_index = trial.target_pos || trial.target_word_index;
+            data.entropy = trial.entropy;
+            data.target_probability = trial.target_probability;
+            data.jabber_sentence = trial.jabber_passage || trial.nonsense_sentence;
+            data.real_sentence = trial.passage_variant || trial.ground_truth_sentence;
             
             const guess = data.response.target_word_guess.toLowerCase().trim().replace(/[.,!?]/g, '');
             const correct = trial.target_word.toLowerCase().trim().replace(/[.,!?]/g, '');
@@ -246,7 +364,7 @@ async function createTimeline() {
     
     let timeline = [welcome, instructions];
     
-    // Add trials for each sentence
+    // Add trials for each sentence (now in randomized order)
     for (let i = 0; i < trialData.length; i++) {
         timeline.push(createWordRevealTrial(i));
         timeline.push(createGuessInputTrial(i));
@@ -256,7 +374,7 @@ async function createTimeline() {
     const save_data = {
         type: jsPsychPipe,
         action: "save",
-        experiment_id: "6sUXv8MJL3e6", // Your experiment ID
+        experiment_id: "6sUXv8MJL3e6",
         filename: filename,
         data_string: () => jsPsych.data.get().csv()
     };
@@ -277,6 +395,8 @@ async function createTimeline() {
         on_finish: function() {
             jsPsych.data.addProperties({
                 experiment_version: '1.0',
+                sublist: sublistNumber,
+                random_seed: randomSeed,
                 completion_time: new Date().toISOString()
             });
         }
@@ -290,5 +410,12 @@ createTimeline().then(timeline => {
     jsPsych.run(timeline);
 }).catch(error => {
     console.error('Error loading experiment:', error);
-    document.body.innerHTML = '<p>Error loading experiment. Please refresh the page.</p>';
+    document.body.innerHTML = `
+        <div style="text-align: center; padding: 50px;">
+            <h2>Error Loading Experiment</h2>
+            <p>Could not load trial list for sublist ${sublistNumber}.</p>
+            <p>Please make sure the file ${csvFilename} exists.</p>
+            <p>Error: ${error.message}</p>
+        </div>
+    `;
 });
