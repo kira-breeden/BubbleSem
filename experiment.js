@@ -74,9 +74,9 @@ const csvFilename = `trial_list_sublist_${sublistNumber}.csv`;
 // Initialize jsPsych
 const jsPsych = initJsPsych({});
 
-// Initialize filename based on subjCode, sublist, and seed
-const subjCode = jsPsych.randomization.randomID(10);
-const filename = `${subjCode}_sublist${sublistNumber}_seed${randomSeed}.csv`;
+// Initialize filename based on participantId, sublist, and seed
+const participantId = jsPsych.randomization.randomID(10);
+const filename = `${participantId}_sublist${sublistNumber}_seed${randomSeed}.csv`;
 
 // Function to tokenize sentence into words and punctuation
 function tokenizeSentence(sentence) {
@@ -347,7 +347,7 @@ function createWordRevealTrial(trialIndex) {
             // Store word-reveal data for this trial
             const trialObj = {
                 trial_number: trialNumber,
-                subjCode: subjCode,
+                participantId: participantId,
                 sublist: sublistNumber,
                 random_seed: randomSeed,
                 target_word: trial.target_word,
@@ -528,9 +528,9 @@ async function createTimeline() {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function() {
             // Get survey URL from URL parameter or use default
-            const surveyURL = getURLParameter('survey_url') || 'https://uwmadison.co1.qualtrics.com/jfe/form/SV_0VC8tugavHYnhoa';
-            // Add subjCode to survey URL
-            const surveyWithId = `${surveyURL}${surveyURL.includes('?') ? '&' : '?'}subjCode=${subjCode}`;
+            const surveyURL = getURLParameter('survey_url') || 'https://your-survey-link.com';
+            // Add participantId to survey URL
+            const surveyWithId = `${surveyURL}${surveyURL.includes('?') ? '&' : '?'}participantId=${participantId}`;
             
             return `
                 <div style="text-align: center;">
@@ -554,7 +554,7 @@ async function createTimeline() {
                 experiment_version: '1.0',
                 sublist: sublistNumber,
                 random_seed: randomSeed,
-                subjCode: subjCode,
+                participantId: participantId,
                 completion_time: new Date().toISOString()
             });
         }
