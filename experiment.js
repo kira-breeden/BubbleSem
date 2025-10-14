@@ -122,31 +122,42 @@ function parseWordToNonce(trial) {
 }
 
 // Function to find target word index in tokenized sentence
-function findTargetWordIndex(tokens, targetWord, targetPos) {
-    // If targetPos is a number, we need to map from word position to token position
-    if (typeof targetPos === 'number') {
-        let wordCount = 0;
-        for (let i = 0; i < tokens.length; i++) {
-            // Skip punctuation tokens
-            if (!/^[.,!?;:'"]$/.test(tokens[i])) {
-                if (wordCount === targetPos) {
-                    return i;
+function findTargetWordIndex(tokens, targetWord, targetWordIndex) {
+    const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
+    
+    // If targetWordIndex is provided and is a valid number, use it to find the nth word token
+    if (targetWordIndex !== null && targetWordIndex !== undefined && targetWordIndex !== '') {
+        const posNum = typeof targetWordIndex === 'string' ? parseInt(targetWordIndex) : targetWordIndex;
+        
+        if (!isNaN(posNum) && posNum >= 0) {
+            let wordCount = 0;
+            for (let i = 0; i < tokens.length; i++) {
+                // Skip punctuation tokens
+                if (!/^[.,!?;:'"]$/.test(tokens[i])) {
+                    if (wordCount === posNum) {
+                        console.log(`Found target at token index ${i} (word position ${posNum}): "${tokens[i]}"`);
+                        return i;
+                    }
+                    wordCount++;
                 }
-                wordCount++;
+            }
+            console.warn(`Could not find word at position ${posNum}, falling back to text search`);
+        }
+    }
+    
+    // Search for the target word by text
+    for (let i = 0; i < tokens.length; i++) {
+        // Skip punctuation tokens
+        if (!/^[.,!?;:'"]$/.test(tokens[i])) {
+            const cleanToken = tokens[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
+            if (cleanToken === cleanTarget) {
+                console.log(`Found target by text search at token index ${i}: "${tokens[i]}"`);
+                return i;
             }
         }
     }
     
-    // Otherwise, search for the target word
-    const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
-    for (let i = 0; i < tokens.length; i++) {
-        const cleanToken = tokens[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
-        if (cleanToken === cleanTarget && !/^[.,!?;:'"]$/.test(tokens[i])) {
-            return i;
-        }
-    }
-    
-    console.error(`Could not find target word '${targetWord}' in sentence`);
+    console.error(`Could not find target word '${targetWord}' in sentence. Tokens:`, tokens);
     return -1;
 }
 
@@ -213,8 +224,8 @@ function createWordRevealTrial(trialIndex) {
     
     // Get target word and find its position
     const targetWord = trial.target_word;
-    const targetPos = trial.target_pos || trial.target_word_index;
-    const targetIndex = findTargetWordIndex(jabberTokens, targetWord, targetPos);
+    const targetWordPosition = trial.target_word_position; // Added by preprocessing script
+    const targetIndex = findTargetWordIndex(jabberTokens, targetWord, targetWordPosition);
     
     const trialNumber = trialIndex + 1;
     const originalTrialNumber = trial.trial_number || trialNumber;
@@ -222,12 +233,14 @@ function createWordRevealTrial(trialIndex) {
     // Debug logging
     console.log(`Trial ${trialNumber}:`, {
         targetWord,
-        targetPos,
+        targetWordIndex,
         targetIndex,
         realTokensCount: realTokens.length,
         jabberTokensCount: jabberTokens.length,
         targetInReal: realTokens[targetIndex],
-        targetInJabber: jabberTokens[targetIndex]
+        targetInJabber: jabberTokens[targetIndex],
+        jabberTokens: jabberTokens,
+        realTokens: realTokens
     });
     
     // Validation
