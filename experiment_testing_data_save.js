@@ -6,8 +6,8 @@ let revealedWords = new Set();
 let startTime = null;
 let clickTimes = [];
 let randomSeed = null;
-let totalPoints = 100; // Starting points
-const POINTS_PER_REVEAL = 3; // Points lost per word reveal
+let totalPoints = 250; // Starting points
+const POINTS_PER_REVEAL = 2; // Points lost per word reveal
 let completedTrials = []; // Store completed trial data
 
 // Articles that should not be obscured
