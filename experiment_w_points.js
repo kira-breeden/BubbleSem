@@ -6,7 +6,7 @@ let revealedWords = new Set();
 let startTime = null;
 let clickTimes = [];
 let randomSeed = null;
-let totalPoints = 100; // Starting points
+let totalPoints = 200; // Starting points
 const POINTS_PER_REVEAL = 3; // Points lost per word reveal
 
 // Articles that should not be obscured

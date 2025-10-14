@@ -412,8 +412,12 @@ function createConfidenceRatingTrial(trialIndex) {
             completedTrials[trialIndex].confidence_rating = data.response + 1; // Convert 0-4 to 1-5
             completedTrials[trialIndex].rt_confidence = data.rt;
             
-            // Now save this completed trial to jsPsych data
-            jsPsych.data.write(completedTrials[trialIndex]);
+            // Write this completed trial to jsPsych's data store
+            // This ensures it gets saved by jsPsychPipe
+            const trialData = completedTrials[trialIndex];
+            for (let key in trialData) {
+                data[key] = trialData[key];
+            }
         }
     };
 }
@@ -498,41 +502,9 @@ async function createTimeline() {
         experiment_id: "6sUXv8MJL3e6",
         filename: filename,
         data_string: () => {
-            // Create CSV from completedTrials array
-            if (completedTrials.length === 0) {
-                return jsPsych.data.get().csv(); // Fallback to regular jsPsych data
-            }
-            
-            // Filter out any undefined/null entries
-            const validTrials = completedTrials.filter(t => t !== undefined && t !== null);
-            
-            if (validTrials.length === 0) {
-                return jsPsych.data.get().csv(); // Fallback if no valid trials
-            }
-            
-            // Get column headers from first trial
-            const headers = Object.keys(validTrials[0]);
-            let csv = headers.join(',') + '\n';
-            
-            // Add data rows
-            validTrials.forEach(trial => {
-                const row = headers.map(header => {
-                    const value = trial[header];
-                    // Handle undefined/null
-                    if (value === undefined || value === null) {
-                        return '';
-                    }
-                    // Escape values that contain commas or quotes
-                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-                        return '"' + value.replace(/"/g, '""') + '"';
-                    }
-                    return value;
-                });
-                csv += row.join(',') + '\n';
-            });
-            
-            console.log('Saving completedTrials:', validTrials);
-            return csv;
+            // Filter to only confidence-rating trials (which have all the combined data)
+            const confidenceTrials = jsPsych.data.get().filter({trial_type: 'confidence-rating'});
+            return confidenceTrials.csv();
         }
     };
     
