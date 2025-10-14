@@ -237,9 +237,10 @@ function createWordRevealTrial(trialIndex) {
             clickTimes = [];
             
             let html = `
-                <div class="trial-counter">Trial ${trialNumber} of ${trialData.length}</div>
-                <div class="points-counter" id="points-counter">Points: ${totalPoints}</div>
-                <div class="sentence-container" id="sentence-container">
+                <div style="position: relative;">
+                    <div class="trial-counter">Trial ${trialNumber} of ${trialData.length}</div>
+                    <div class="points-counter" id="points-counter">Points: ${totalPoints}</div>
+                    <div class="sentence-container" id="sentence-container">
             `;
             
             // Build sentence token by token
