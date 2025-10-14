@@ -412,9 +412,19 @@ function createConfidenceRatingTrial(trialIndex) {
             completedTrials[trialIndex].confidence_rating = data.response + 1; // Convert 0-4 to 1-5
             completedTrials[trialIndex].rt_confidence = data.rt;
             
-            // Write this completed trial to jsPsych's data store
-            // This ensures it gets saved by jsPsychPipe
+            // REPLACE all data properties with our completedTrials data
+            // First, get the keys from our completed trial
             const trialData = completedTrials[trialIndex];
+            
+            // Clear existing data properties (except internal jsPsych ones)
+            const internalKeys = ['trial_type', 'trial_index', 'time_elapsed', 'internal_node_id'];
+            for (let key in data) {
+                if (!internalKeys.includes(key)) {
+                    delete data[key];
+                }
+            }
+            
+            // Now add our custom data
             for (let key in trialData) {
                 data[key] = trialData[key];
             }
