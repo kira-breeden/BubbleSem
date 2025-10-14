@@ -77,6 +77,30 @@ const jsPsych = initJsPsych({});
 const subject_id = jsPsych.randomization.randomID(10);
 const filename = `${subject_id}_sublist${sublistNumber}_seed${randomSeed}.csv`;
 
+// Function to tokenize sentence into words and punctuation
+function tokenizeSentence(sentence) {
+    // Split on spaces and punctuation, keeping punctuation as separate tokens
+    const tokens = [];
+    const words = sentence.split(' ');
+    
+    words.forEach(word => {
+        // Match word and trailing punctuation separately
+        const match = word.match(/^([^.,!?;:'"]*)([.,!?;:'"]*)$/);
+        if (match) {
+            const [, wordPart, punctPart] = match;
+            if (wordPart) tokens.push(wordPart);
+            if (punctPart) {
+                // Add each punctuation mark as separate token
+                punctPart.split('').forEach(p => tokens.push(p));
+            }
+        } else {
+            tokens.push(word);
+        }
+    });
+    
+    return tokens;
+}
+
 // Function to parse word_to_nonce mapping
 function parseWordToNonce(trial) {
     let mapping = {};
@@ -97,18 +121,27 @@ function parseWordToNonce(trial) {
     return mapping;
 }
 
-// Function to find target word index in sentence
-function findTargetWordIndex(words, targetWord, targetPos) {
-    // If targetPos is a number, use it directly
-    if (typeof targetPos === 'number' && targetPos >= 0 && targetPos < words.length) {
-        return targetPos;
+// Function to find target word index in tokenized sentence
+function findTargetWordIndex(tokens, targetWord, targetPos) {
+    // If targetPos is a number, we need to map from word position to token position
+    if (typeof targetPos === 'number') {
+        let wordCount = 0;
+        for (let i = 0; i < tokens.length; i++) {
+            // Skip punctuation tokens
+            if (!/^[.,!?;:'"]$/.test(tokens[i])) {
+                if (wordCount === targetPos) {
+                    return i;
+                }
+                wordCount++;
+            }
+        }
     }
     
     // Otherwise, search for the target word
-    for (let i = 0; i < words.length; i++) {
-        const cleanWord = words[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
-        const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
-        if (cleanWord === cleanTarget) {
+    const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
+    for (let i = 0; i < tokens.length; i++) {
+        const cleanToken = tokens[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
+        if (cleanToken === cleanTarget && !/^[.,!?;:'"]$/.test(tokens[i])) {
             return i;
         }
     }
@@ -116,6 +149,7 @@ function findTargetWordIndex(words, targetWord, targetPos) {
     console.error(`Could not find target word '${targetWord}' in sentence`);
     return -1;
 }
+
 
 // Function to load and randomize CSV data
 function loadTrialData() {
@@ -165,7 +199,7 @@ function loadTrialData() {
     });
 }
 
-// Function to create word reveal trial
+// Updated createWordRevealTrial function
 function createWordRevealTrial(trialIndex) {
     const trial = trialData[trialIndex];
     
@@ -173,39 +207,32 @@ function createWordRevealTrial(trialIndex) {
     const realSentence = trial.passage_variant || trial.ground_truth_sentence || '';
     const jabberSentence = trial.jabber_passage || trial.nonsense_sentence || '';
     
-    const realWords = realSentence.split(' ');
-    const jabberWords = jabberSentence.split(' ');
+    // Tokenize sentences (separating words and punctuation)
+    const realTokens = tokenizeSentence(realSentence);
+    const jabberTokens = tokenizeSentence(jabberSentence);
     
     // Get target word and find its position
     const targetWord = trial.target_word;
     const targetPos = trial.target_pos || trial.target_word_index;
-    const targetIndex = findTargetWordIndex(realWords, targetWord, targetPos);
+    const targetIndex = findTargetWordIndex(jabberTokens, targetWord, targetPos);
     
-    const trialNumber = trialIndex + 1; // Use position in randomized order
+    const trialNumber = trialIndex + 1;
     const originalTrialNumber = trial.trial_number || trialNumber;
-    
-    // Get word-to-nonce mapping
-    const wordToNonce = parseWordToNonce(trial);
     
     // Debug logging
     console.log(`Trial ${trialNumber}:`, {
         targetWord,
         targetPos,
         targetIndex,
-        realWordsCount: realWords.length,
-        jabberWordsCount: jabberWords.length,
-        targetInReal: realWords[targetIndex],
-        targetInJabber: jabberWords[targetIndex]
+        realTokensCount: realTokens.length,
+        jabberTokensCount: jabberTokens.length,
+        targetInReal: realTokens[targetIndex],
+        targetInJabber: jabberTokens[targetIndex]
     });
     
     // Validation
-    if (targetIndex < 0 || targetIndex >= realWords.length) {
+    if (targetIndex < 0 || targetIndex >= jabberTokens.length) {
         console.error(`Invalid target index ${targetIndex} for trial ${originalTrialNumber}`);
-    }
-    
-    // Verify word counts match
-    if (realWords.length !== jabberWords.length) {
-        console.warn(`Word count mismatch: real=${realWords.length}, jabber=${jabberWords.length}`);
     }
     
     return {
@@ -225,31 +252,44 @@ function createWordRevealTrial(trialIndex) {
                 <div class="sentence-container" id="sentence-container">
             `;
             
-            // Build sentence word by word
-            for (let index = 0; index < jabberWords.length; index++) {
-                let wordClass = 'word';
-                let displayWord = jabberWords[index];
+            // Build sentence token by token
+            for (let index = 0; index < jabberTokens.length; index++) {
+                const token = jabberTokens[index];
                 
-                // Clean word for comparison (remove punctuation)
-                const cleanJabber = jabberWords[index].toLowerCase().replace(/[.,!?;:'"]/g, '');
-                const cleanReal = index < realWords.length ? realWords[index].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
+                // Check if this token is punctuation
+                if (/^[.,!?;:'"]$/.test(token)) {
+                    // Punctuation - just display it without any special styling
+                    html += token;
+                    // Add space after certain punctuation
+                    if (/[.,!?;:]/.test(token) && index < jabberTokens.length - 1) {
+                        html += ' ';
+                    }
+                    continue;
+                }
+                
+                let wordClass = 'word';
+                let displayWord = token;
+                
+                // Clean token for comparison
+                const cleanJabber = token.toLowerCase().replace(/[.,!?;:'"]/g, '');
+                const cleanReal = index < realTokens.length ? realTokens[index].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
                 
                 if (index === targetIndex) {
-                    // This is the target word - keep it as jabberwocky and make it bold
+                    // This is the target word
                     wordClass += ' target';
-                    displayWord = jabberWords[index];
+                    displayWord = token;
                 } else if (articles.includes(cleanJabber) || articles.includes(cleanReal)) {
                     // This is an article - show the real word
                     wordClass += ' article';
-                    displayWord = realWords[index];
+                    displayWord = realTokens[index];
                 } else if (cleanJabber === cleanReal) {
-                    // Word is the same in both (likely punctuation or article) - show real
+                    // Word is the same in both - show real
                     wordClass += ' article';
-                    displayWord = realWords[index];
+                    displayWord = realTokens[index];
                 } else {
                     // Regular word - can be clicked to reveal
                     wordClass += ' clickable';
-                    displayWord = jabberWords[index];
+                    displayWord = token;
                 }
                 
                 html += `<span class="${wordClass}" data-index="${index}">${displayWord}</span>`;
@@ -275,11 +315,11 @@ function createWordRevealTrial(trialIndex) {
                         revealedWords.add(index);
                         clickTimes.push({
                             word_index: index,
-                            revealed_word: realWords[index],
+                            revealed_word: realTokens[index],
                             time_from_start: Date.now() - startTime
                         });
                         
-                        this.textContent = realWords[index];
+                        this.textContent = realTokens[index];
                         this.classList.remove('clickable');
                         this.classList.add('revealed');
                     }
@@ -287,6 +327,11 @@ function createWordRevealTrial(trialIndex) {
             });
             
             document.getElementById('guess-btn').addEventListener('click', function() {
+                // Filter out punctuation from revealed words
+                const revealedWordsList = Array.from(revealedWords)
+                    .filter(idx => !/^[.,!?;:'"]$/.test(realTokens[idx]))
+                    .map(idx => realTokens[idx]);
+                
                 jsPsych.finishTrial({
                     trial_type: 'word-reveal',
                     trial_number: trialNumber,
@@ -298,11 +343,11 @@ function createWordRevealTrial(trialIndex) {
                     target_word: trial.target_word,
                     entropy: trial.entropy,
                     target_probability: trial.target_probability,
-                    revealed_words: Array.from(revealedWords).map(idx => realWords[idx]),
+                    revealed_words: revealedWordsList,
                     revealed_word_indices: Array.from(revealedWords),
                     click_times: clickTimes,
                     total_time_before_guess: Date.now() - startTime,
-                    num_words_revealed: revealedWords.size,
+                    num_words_revealed: revealedWordsList.length,
                     jabber_sentence: jabberSentence,
                     real_sentence: realSentence
                 });
