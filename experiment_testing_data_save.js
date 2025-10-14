@@ -520,50 +520,26 @@ async function createTimeline() {
         experiment_id: "6sUXv8MJL3e6",
         filename: filename,
         data_string: () => {
-            console.log('data_string function called');
-            console.log('completedTrials:', completedTrials);
-            console.log('completedTrials.length:', completedTrials.length);
+            // Use jsPsych's built-in CSV generation but only for confidence trials
+            // which now have all the combined data
+            const allData = jsPsych.data.get();
+            const confidenceData = allData.filter({trial_type: 'html-button-response'});
             
-            // Only save the completedTrials data, not all jsPsych trial data
-            if (completedTrials.length === 0) {
-                console.error('No completed trials to save!');
-                return '';
+            console.log('Filtering to confidence trials');
+            console.log('Total trials:', allData.count());
+            console.log('Confidence trials:', confidenceData.count());
+            
+            // Log the first confidence trial to see what columns it has
+            if (confidenceData.count() > 0) {
+                const firstTrial = confidenceData.values()[0];
+                console.log('First confidence trial columns:', Object.keys(firstTrial));
+                console.log('First confidence trial data:', firstTrial);
             }
             
-            // Filter out any undefined/null entries
-            const validTrials = completedTrials.filter(t => t !== undefined && t !== null);
-            console.log('validTrials.length:', validTrials.length);
+            const csvString = confidenceData.csv();
+            console.log('CSV first 1000 chars:', csvString.substring(0, 1000));
             
-            if (validTrials.length === 0) {
-                console.error('No valid completed trials!');
-                return '';
-            }
-            
-            // Get column headers from first trial
-            const headers = Object.keys(validTrials[0]);
-            let csv = headers.join(',') + '\n';
-            
-            // Add data rows
-            validTrials.forEach(trial => {
-                const row = headers.map(header => {
-                    const value = trial[header];
-                    // Handle undefined/null
-                    if (value === undefined || value === null) {
-                        return '';
-                    }
-                    // Escape values that contain commas or quotes
-                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-                        return '"' + value.replace(/"/g, '""') + '"';
-                    }
-                    return value;
-                });
-                csv += row.join(',') + '\n';
-            });
-            
-            console.log('Saving CSV with', validTrials.length, 'rows');
-            console.log('Headers:', headers.join(', '));
-            console.log('CSV length:', csv.length);
-            return csv;
+            return csvString;
         },
         on_finish: function(data) {
             console.log('Save trial finished');
