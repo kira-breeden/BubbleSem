@@ -502,27 +502,62 @@ async function createTimeline() {
         experiment_id: "6sUXv8MJL3e6",
         filename: filename,
         data_string: () => {
-            const csvData = jsPsych.data.get().csv();
-            console.log('About to save data. Filename:', filename);
-            console.log('CSV length:', csvData.length);
-            console.log('First 500 chars:', csvData.substring(0, 500));
-            return csvData;
+            // Only save the completedTrials data, not all jsPsych trial data
+            if (completedTrials.length === 0) {
+                console.error('No completed trials to save!');
+                return '';
+            }
+            
+            // Filter out any undefined/null entries
+            const validTrials = completedTrials.filter(t => t !== undefined && t !== null);
+            
+            if (validTrials.length === 0) {
+                console.error('No valid completed trials!');
+                return '';
+            }
+            
+            // Get column headers from first trial
+            const headers = Object.keys(validTrials[0]);
+            let csv = headers.join(',') + '\n';
+            
+            // Add data rows
+            validTrials.forEach(trial => {
+                const row = headers.map(header => {
+                    const value = trial[header];
+                    // Handle undefined/null
+                    if (value === undefined || value === null) {
+                        return '';
+                    }
+                    // Escape values that contain commas or quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += row.join(',') + '\n';
+            });
+            
+            console.log('Saving CSV with', validTrials.length, 'trials');
+            console.log('Headers:', headers.join(', '));
+            return csv;
         }
     };
     
-    // Write completedTrials to jsPsych data store before saving
+    // Write completedTrials to jsPsych data store for final_score to be added
     timeline.push({
         type: jsPsychHtmlKeyboardResponse,
         stimulus: '',
         trial_duration: 1,
         on_start: function() {
-            // Write all completedTrials to jsPsych data
-            console.log('Writing completedTrials to jsPsych data:', completedTrials);
+            finalScore = totalPoints;
+            // Add final score to each completed trial
             completedTrials.forEach(trial => {
                 if (trial) {
-                    jsPsych.data.write(trial);
+                    trial.final_score = finalScore;
+                    trial.completion_time = new Date().toISOString();
                 }
             });
+            console.log('Added final_score to completedTrials:', finalScore);
         }
     });
     
