@@ -6,6 +6,7 @@ let revealedWords = new Set();
 let startTime = null;
 let clickTimes = [];
 let randomSeed = null;
+let completedTrials = []; // Store completed trial data
 
 // Articles that should not be obscured
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
@@ -74,7 +75,7 @@ const csvFilename = `trial_list_sublist_${sublistNumber}.csv`;
 const jsPsych = initJsPsych({});
 
 // Initialize filename based on subjCode, sublist, and seed
-const subjCode = getURLParameter('subjCode');
+const subjCode = jsPsych.randomization.randomID(10);
 const filename = `${subjCode}_sublist${sublistNumber}_seed${randomSeed}.csv`;
 
 // Function to tokenize sentence into words and punctuation
@@ -336,27 +337,35 @@ function createWordRevealTrial(trialIndex) {
                 
                 jsPsych.finishTrial({
                     trial_type: 'word-reveal',
-                    trial_number: trialNumber,
-                    original_trial_number: originalTrialNumber,
-                    randomization_position: trialIndex + 1,
-                    sublist: sublistNumber,
-                    random_seed: randomSeed,
-                    target_word_index: targetIndex,
-                    target_word: trial.target_word,
-                    entropy: trial.entropy,
-                    target_probability: trial.target_probability,
-                    revealed_words: revealedWordsList,
-                    revealed_word_indices: Array.from(revealedWords),
-                    click_times: clickTimes,
-                    total_time_before_guess: Date.now() - startTime,
-                    num_words_revealed: revealedWordsList.length,
-                    jabber_sentence: jabberSentence,
-                    real_sentence: realSentence
+                    trial_continues: true // Flag that this trial will be completed later
                 });
             });
         },
         trial_duration: null,
-        response_ends_trial: false
+        response_ends_trial: false,
+        on_finish: function(data) {
+            // Store word-reveal data for this trial
+            const trialObj = {
+                trial_number: trialNumber,
+                subjCode: subjCode,
+                sublist: sublistNumber,
+                random_seed: randomSeed,
+                target_word: trial.target_word,
+                target_word_position: trial.target_word_position || targetIndex,
+                entropy: trial.entropy,
+                target_probability: trial.target_probability,
+                jabber_sentence: jabberSentence,
+                real_sentence: realSentence,
+                num_words_revealed: revealedWordsList.length,
+                revealed_words: JSON.stringify(revealedWordsList),
+                revealed_word_indices: JSON.stringify(Array.from(revealedWords)),
+                click_times: JSON.stringify(clickTimes),
+                total_time_before_guess: Date.now() - startTime
+            };
+            
+            // Store in global array (will be updated with guess and confidence data)
+            completedTrials[trialIndex] = trialObj;
+        }
     };
 }
 
@@ -369,21 +378,19 @@ function createConfidenceRatingTrial(trialIndex) {
     return {
         type: jsPsychHtmlButtonResponse,
         stimulus: `
-            <div class="instructions">
+            <div style="text-align: center;">
                 <p>How confident are you that you guessed the bolded word correctly?</p>
             </div>
         `,
         choices: ['1<br>Not at all confident', '2<br>Slightly confident', '3<br>Moderately confident', '4<br>Very confident', '5<br>Extremely confident'],
         button_html: '<button class="jspsych-btn" style="margin: 10px; padding: 15px 25px; font-size: 16px;">%choice%</button>',
         on_finish: function(data) {
-            data.trial_type = 'confidence-rating';
-            data.trial_number = trialNumber;
-            data.original_trial_number = originalTrialNumber;
-            data.randomization_position = trialIndex + 1;
-            data.sublist = sublistNumber;
-            data.random_seed = randomSeed;
-            data.confidence_rating = data.response + 1; // Convert 0-4 to 1-5
-            data.target_word = trial.target_word;
+            // Add confidence data to the stored trial object
+            completedTrials[trialIndex].confidence_rating = data.response + 1; // Convert 0-4 to 1-5
+            completedTrials[trialIndex].rt_confidence = data.rt;
+            
+            // Now save this completed trial to jsPsych data
+            jsPsych.data.write(completedTrials[trialIndex]);
         }
     };
 }
@@ -487,7 +494,31 @@ async function createTimeline() {
         action: "save",
         experiment_id: "6sUXv8MJL3e6",
         filename: filename,
-        data_string: () => jsPsych.data.get().csv()
+        data_string: () => {
+            // Create CSV from completedTrials array
+            if (completedTrials.length === 0) {
+                return '';
+            }
+            
+            // Get column headers from first trial
+            const headers = Object.keys(completedTrials[0]);
+            let csv = headers.join(',') + '\n';
+            
+            // Add data rows
+            completedTrials.forEach(trial => {
+                const row = headers.map(header => {
+                    const value = trial[header];
+                    // Escape values that contain commas or quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += row.join(',') + '\n';
+            });
+            
+            return csv;
+        }
     };
     
     timeline.push(save_data);
