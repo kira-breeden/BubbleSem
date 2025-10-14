@@ -502,11 +502,29 @@ async function createTimeline() {
         experiment_id: "6sUXv8MJL3e6",
         filename: filename,
         data_string: () => {
-            // Filter to only confidence-rating trials (which have all the combined data)
-            const confidenceTrials = jsPsych.data.get().filter({trial_type: 'confidence-rating'});
-            return confidenceTrials.csv();
+            const csvData = jsPsych.data.get().csv();
+            console.log('About to save data. Filename:', filename);
+            console.log('CSV length:', csvData.length);
+            console.log('First 500 chars:', csvData.substring(0, 500));
+            return csvData;
         }
     };
+    
+    // Write completedTrials to jsPsych data store before saving
+    timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '',
+        trial_duration: 1,
+        on_start: function() {
+            // Write all completedTrials to jsPsych data
+            console.log('Writing completedTrials to jsPsych data:', completedTrials);
+            completedTrials.forEach(trial => {
+                if (trial) {
+                    jsPsych.data.write(trial);
+                }
+            });
+        }
+    });
     
     timeline.push(save_data);
     
