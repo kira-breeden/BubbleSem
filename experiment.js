@@ -101,33 +101,13 @@ function tokenizeSentence(sentence) {
     return tokens;
 }
 
-// Function to parse word_to_nonce mapping
-function parseWordToNonce(trial) {
-    let mapping = {};
-    
-    if (trial.word_to_nonce) {
-        try {
-            // Handle both JSON string and object
-            if (typeof trial.word_to_nonce === 'string') {
-                mapping = JSON.parse(trial.word_to_nonce);
-            } else {
-                mapping = trial.word_to_nonce;
-            }
-        } catch (e) {
-            console.warn('Could not parse word_to_nonce:', e);
-        }
-    }
-    
-    return mapping;
-}
-
 // Function to find target word index in tokenized sentence
-function findTargetWordIndex(tokens, targetWord, targetWordIndex) {
+function findTargetWordIndex(tokens, targetWord, targetWordPosition) {
     const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
     
-    // If targetWordIndex is provided and is a valid number, use it to find the nth word token
-    if (targetWordIndex !== null && targetWordIndex !== undefined && targetWordIndex !== '') {
-        const posNum = typeof targetWordIndex === 'string' ? parseInt(targetWordIndex) : targetWordIndex;
+    // If targetWordPosition is provided and valid, use it to find the nth word token
+    if (targetWordPosition !== null && targetWordPosition !== undefined && targetWordPosition !== '') {
+        const posNum = typeof targetWordPosition === 'string' ? parseInt(targetWordPosition) : targetWordPosition;
         
         if (!isNaN(posNum) && posNum >= 0) {
             let wordCount = 0;
@@ -135,7 +115,6 @@ function findTargetWordIndex(tokens, targetWord, targetWordIndex) {
                 // Skip punctuation tokens
                 if (!/^[.,!?;:'"]$/.test(tokens[i])) {
                     if (wordCount === posNum) {
-                        console.log(`Found target at token index ${i} (word position ${posNum}): "${tokens[i]}"`);
                         return i;
                     }
                     wordCount++;
@@ -145,22 +124,20 @@ function findTargetWordIndex(tokens, targetWord, targetWordIndex) {
         }
     }
     
-    // Search for the target word by text
+    // Fall back to searching for the target word by text
     for (let i = 0; i < tokens.length; i++) {
         // Skip punctuation tokens
         if (!/^[.,!?;:'"]$/.test(tokens[i])) {
             const cleanToken = tokens[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
             if (cleanToken === cleanTarget) {
-                console.log(`Found target by text search at token index ${i}: "${tokens[i]}"`);
                 return i;
             }
         }
     }
     
-    console.error(`Could not find target word '${targetWord}' in sentence. Tokens:`, tokens);
+    console.error(`Could not find target word '${targetWord}' in sentence`);
     return -1;
 }
-
 
 // Function to load and randomize CSV data
 function loadTrialData() {
@@ -210,7 +187,7 @@ function loadTrialData() {
     });
 }
 
-// Updated createWordRevealTrial function
+// Function to create word reveal trial
 function createWordRevealTrial(trialIndex) {
     const trial = trialData[trialIndex];
     
@@ -225,7 +202,20 @@ function createWordRevealTrial(trialIndex) {
     // Get target word and find its position
     const targetWord = trial.target_word;
     const targetWordPosition = trial.target_word_position; // Added by preprocessing script
+    
+    console.log('Before finding target:', {
+        targetWord,
+        targetWordPosition,
+        targetWordPositionType: typeof targetWordPosition,
+        jabberTokens
+    });
+    
     const targetIndex = findTargetWordIndex(jabberTokens, targetWord, targetWordPosition);
+    
+    console.log('After finding target:', {
+        targetIndex,
+        tokenAtIndex: jabberTokens[targetIndex]
+    });
     
     const trialNumber = trialIndex + 1;
     const originalTrialNumber = trial.trial_number || trialNumber;
@@ -233,14 +223,12 @@ function createWordRevealTrial(trialIndex) {
     // Debug logging
     console.log(`Trial ${trialNumber}:`, {
         targetWord,
-        targetWordIndex,
+        targetWordPosition,
         targetIndex,
         realTokensCount: realTokens.length,
         jabberTokensCount: jabberTokens.length,
         targetInReal: realTokens[targetIndex],
-        targetInJabber: jabberTokens[targetIndex],
-        jabberTokens: jabberTokens,
-        realTokens: realTokens
+        targetInJabber: jabberTokens[targetIndex]
     });
     
     // Validation
@@ -269,6 +257,8 @@ function createWordRevealTrial(trialIndex) {
             for (let index = 0; index < jabberTokens.length; index++) {
                 const token = jabberTokens[index];
                 
+                console.log(`Token ${index}: "${token}", targetIndex: ${targetIndex}, match: ${index === targetIndex}`);
+                
                 // Check if this token is punctuation
                 if (/^[.,!?;:'"]$/.test(token)) {
                     // Punctuation - just display it without any special styling
@@ -287,8 +277,11 @@ function createWordRevealTrial(trialIndex) {
                 const cleanJabber = token.toLowerCase().replace(/[.,!?;:'"]/g, '');
                 const cleanReal = index < realTokens.length ? realTokens[index].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
                 
+                console.log(`  Checking token ${index}: cleanJabber="${cleanJabber}", cleanReal="${cleanReal}", isTarget=${index === targetIndex}`);
+                
                 if (index === targetIndex) {
                     // This is the target word
+                    console.log(`  -> Marking as TARGET`);
                     wordClass += ' target';
                     displayWord = token;
                 } else if (articles.includes(cleanJabber) || articles.includes(cleanReal)) {
@@ -399,7 +392,7 @@ function createGuessInputTrial(trialIndex) {
             data.sublist = sublistNumber;
             data.random_seed = randomSeed;
             data.correct_target_word = trial.target_word;
-            data.target_word_index = trial.target_pos || trial.target_word_index;
+            data.target_word_position = trial.target_word_position;
             data.entropy = trial.entropy;
             data.target_probability = trial.target_probability;
             data.jabber_sentence = trial.jabber_passage || trial.nonsense_sentence;
