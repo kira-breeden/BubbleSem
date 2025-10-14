@@ -73,9 +73,9 @@ const csvFilename = `trial_list_sublist_${sublistNumber}.csv`;
 // Initialize jsPsych
 const jsPsych = initJsPsych({});
 
-// Initialize filename based on workerId, sublist, and seed
-const subject_id = jsPsych.randomization.randomID(10);
-const filename = `${subject_id}_sublist${sublistNumber}_seed${randomSeed}.csv`;
+// Initialize filename based on subjCode, sublist, and seed
+const subjCode = getURLParameter('subjCode');
+const filename = `${subjCode}_sublist${sublistNumber}_seed${randomSeed}.csv`;
 
 // Function to tokenize sentence into words and punctuation
 function tokenizeSentence(sentence) {
@@ -246,10 +246,6 @@ function createWordRevealTrial(trialIndex) {
             
             let html = `
                 <div class="trial-counter">Trial ${trialNumber} of ${trialData.length}</div>
-                <div class="instructions">
-                    <p>Click on words to reveal their true meaning. The <strong>bolded word</strong> cannot be revealed - try to guess what it is based on the other words you reveal.</p>
-                    <p>When you're ready to guess the bolded word, click "Make Guess".</p>
-                </div>
                 <div class="sentence-container" id="sentence-container">
             `;
             
@@ -364,7 +360,33 @@ function createWordRevealTrial(trialIndex) {
     };
 }
 
-// Function to create guess input trial
+// Function to create confidence rating trial
+function createConfidenceRatingTrial(trialIndex) {
+    const trial = trialData[trialIndex];
+    const trialNumber = trialIndex + 1;
+    const originalTrialNumber = trial.trial_number || trialNumber;
+    
+    return {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+            <div class="instructions">
+                <p>How confident are you that you guessed the bolded word correctly?</p>
+            </div>
+        `,
+        choices: ['1<br>Not at all confident', '2<br>Slightly confident', '3<br>Moderately confident', '4<br>Very confident', '5<br>Extremely confident'],
+        button_html: '<button class="jspsych-btn" style="margin: 10px; padding: 15px 25px; font-size: 16px;">%choice%</button>',
+        on_finish: function(data) {
+            data.trial_type = 'confidence-rating';
+            data.trial_number = trialNumber;
+            data.original_trial_number = originalTrialNumber;
+            data.randomization_position = trialIndex + 1;
+            data.sublist = sublistNumber;
+            data.random_seed = randomSeed;
+            data.confidence_rating = data.response + 1; // Convert 0-4 to 1-5
+            data.target_word = trial.target_word;
+        }
+    };
+}
 function createGuessInputTrial(trialIndex) {
     const trial = trialData[trialIndex];
     const trialNumber = trialIndex + 1;
@@ -456,6 +478,7 @@ async function createTimeline() {
     for (let i = 0; i < trialData.length; i++) {
         timeline.push(createWordRevealTrial(i));
         timeline.push(createGuessInputTrial(i));
+        timeline.push(createConfidenceRatingTrial(i));
     }
     
     // Add data saving trial using jsPsychPipe
@@ -469,22 +492,38 @@ async function createTimeline() {
     
     timeline.push(save_data);
     
-    // Thank you message
+    // Thank you message with survey link
     timeline.push({
         type: jsPsychHtmlKeyboardResponse,
-        stimulus: `
-            <div style="text-align: center;">
-                <h2>Thank you!</h2>
-                <p>You have completed the experiment.</p>
-                <p>Your data has been saved.</p>
-                <p>Press any key to finish.</p>
-            </div>
-        `,
+        stimulus: function() {
+            // Get survey URL from URL parameter or use default
+            const surveyURL = getURLParameter('survey_url') || 'https://uwmadison.co1.qualtrics.com/jfe/form/SV_0VC8tugavHYnhoa';
+            // Add subjCode to survey URL
+            const surveyWithId = `${surveyURL}${surveyURL.includes('?') ? '&' : '?'}subjCode=${subjCode}`;
+            
+            return `
+                <div style="text-align: center;">
+                    <h2>Thank you!</h2>
+                    <p>You have completed the experiment.</p>
+                    <p>Your data has been saved.</p>
+                    <p>Please click the link below to complete a brief survey:</p>
+                    <p style="margin-top: 30px;">
+                        <a href="${surveyWithId}" target="_blank" style="font-size: 18px; padding: 15px 30px; background-color: #2196f3; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">
+                            Go to Survey
+                        </a>
+                    </p>
+                    <p style="margin-top: 30px; font-size: 14px; color: #666;">
+                        Press any key after completing the survey to close this window.
+                    </p>
+                </div>
+            `;
+        },
         on_finish: function() {
             jsPsych.data.addProperties({
                 experiment_version: '1.0',
                 sublist: sublistNumber,
                 random_seed: randomSeed,
+                subjCode: subjCode,
                 completion_time: new Date().toISOString()
             });
         }
