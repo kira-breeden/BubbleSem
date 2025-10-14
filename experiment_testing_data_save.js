@@ -408,15 +408,12 @@ function createConfidenceRatingTrial(trialIndex) {
         choices: ['1<br>Not at all confident', '2<br>Slightly confident', '3<br>Moderately confident', '4<br>Very confident', '5<br>Extremely confident'],
         button_html: '<button class="jspsych-btn" style="margin: 10px; padding: 15px 25px; font-size: 16px;">%choice%</button>',
         on_finish: function(data) {
-            data.trial_type = 'confidence-rating';
-            data.trial_number = trialNumber;
-            data.original_trial_number = originalTrialNumber;
-            data.randomization_position = trialIndex + 1;
-            data.sublist = sublistNumber;
-            data.random_seed = randomSeed;
-            data.confidence_rating = data.response + 1; // Convert 0-4 to 1-5
-            data.target_word = trial.target_word;
-            data.points_remaining = totalPoints;
+            // Add confidence data to the stored trial object
+            completedTrials[trialIndex].confidence_rating = data.response + 1; // Convert 0-4 to 1-5
+            completedTrials[trialIndex].rt_confidence = data.rt;
+            
+            // Now save this completed trial to jsPsych data
+            jsPsych.data.write(completedTrials[trialIndex]);
         }
     };
 }
@@ -500,7 +497,43 @@ async function createTimeline() {
         action: "save",
         experiment_id: "6sUXv8MJL3e6",
         filename: filename,
-        data_string: () => jsPsych.data.get().csv()
+        data_string: () => {
+            // Create CSV from completedTrials array
+            if (completedTrials.length === 0) {
+                return jsPsych.data.get().csv(); // Fallback to regular jsPsych data
+            }
+            
+            // Filter out any undefined/null entries
+            const validTrials = completedTrials.filter(t => t !== undefined && t !== null);
+            
+            if (validTrials.length === 0) {
+                return jsPsych.data.get().csv(); // Fallback if no valid trials
+            }
+            
+            // Get column headers from first trial
+            const headers = Object.keys(validTrials[0]);
+            let csv = headers.join(',') + '\n';
+            
+            // Add data rows
+            validTrials.forEach(trial => {
+                const row = headers.map(header => {
+                    const value = trial[header];
+                    // Handle undefined/null
+                    if (value === undefined || value === null) {
+                        return '';
+                    }
+                    // Escape values that contain commas or quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += row.join(',') + '\n';
+            });
+            
+            console.log('Saving completedTrials:', validTrials);
+            return csv;
+        }
     };
     
     timeline.push(save_data);
