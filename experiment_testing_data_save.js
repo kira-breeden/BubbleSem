@@ -437,16 +437,14 @@ const welcome = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
         <div style="max-width: 600px; margin: 0 auto; text-align: left;">
-            <h1>Word Reveal Experiment</h1>
             <p>In this experiment, you will see sentences with made-up nonsense words.</p>
             <p>Your task is to:</p>
             <ul>
-                <li>Click on words to reveal their true meaning</li>
+                <li>Click on words to reveal their true meaning -- try not to click on too many!</li>
                 <li>Try to figure out what the <strong>bolded word</strong> means</li>
                 <li>Make your best guess when you're ready</li>
             </ul>
-            <p><strong>Scoring:</strong> You start with <strong>100 points</strong>. Each word you reveal costs <strong>${POINTS_PER_REVEAL} points</strong>. Try to keep as many points as possible!</p>
-            <p>Note: The bolded word cannot be revealed - you must guess it based on context.</p>
+            <p><strong>Scoring:</strong> You start with <strong>250 points</strong>. Each word you reveal costs <strong>${POINTS_PER_REVEAL} points</strong>. Try to keep as many points as possible!</p>
             <p><em>Press any key to continue</em></p>
         </div>
     `
@@ -460,13 +458,13 @@ const instructions = {
             <h2>Instructions</h2>
             <p>On each trial:</p>
             <ol>
-                <li>You'll see a sentence with nonsense words</li>
+                <li>You'll see a sentence of nonsense words</li>
                 <li>One word will be <strong>bolded</strong> - this is your target word to guess</li>
                 <li>Click on other words to reveal their true meaning (<strong>${POINTS_PER_REVEAL} points each</strong>)</li>
-                <li>When you think you know the bolded word, click "Make Guess"</li>
-                <li>Type your guess for the bolded word</li>
+                <li>Remeber: Try to reveal as few words as possible!</li>
+                <li>Click "Make Guess" when you are ready to try and guess the word!</li>
             </ol>
-            <p><strong>Remember:</strong> You start with 100 points. Your goal is to keep as many points as possible!</p>
+            <p><strong>Remember:</strong> You start with 250 points. Your goal is to keep as many points as possible!</p>
             <p><em>Press any key to start</em></p>
         </div>
     `
@@ -476,7 +474,7 @@ const instructions = {
 async function createTimeline() {
     await loadTrialData();
     
-    let timeline = [welcome, instructions];
+    let timeline = [welcome];
     
     // Add trials for each sentence (now in randomized order)
     for (let i = 0; i < trialData.length; i++) {
