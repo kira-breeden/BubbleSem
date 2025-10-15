@@ -78,7 +78,7 @@ const jsPsych = initJsPsych({});
 
 // Initialize filename based on subjCode, sublist, and seed
 const subjCode = getURLParameter('subjCode');
-const filename = `${subjCode}_sublist${sublistNumber}_seed${randomSeed}.csv`;
+const filename = `${subjCode}.csv`;
 
 // Function to update points display
 function updatePointsDisplay(points) {
