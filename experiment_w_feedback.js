@@ -497,7 +497,7 @@ const examples_page1 = {
             <p>Now you might have some better guesses about what <strong>glosh</strong> could be! Is it maybe sun? sunshine? air? light? </p>
             <p> <strong>This is the right level of specificity for your guess. </strong></p>
             
-            <p style="margin-top: 30px;"><em>Press any key to start</em></p>
+            <p style="margin-top: 30px;"><em>Press any key to continue</em></p>
         </div>
     `
 };
