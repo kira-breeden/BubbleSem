@@ -521,11 +521,20 @@ const examples_page2 = {
     `
 };
 
+const start_study = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+        <div style="max-width: 600px; margin: 0 auto; text-align: left;">
+            <h2>Press Any Key to Start Experiment</h2>
+        </div>
+    `
+};
+
 // Create timeline
 async function createTimeline() {
     await loadTrialData();
     
-    let timeline = [welcome, examples_page1, examples_page2];
+    let timeline = [welcome, examples_page1, examples_page2, start_study];
     
     // Add trials for each sentence (now in randomized order)
     for (let i = 0; i < trialData.length; i++) {
