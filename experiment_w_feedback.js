@@ -432,6 +432,27 @@ function createConfidenceRatingTrial(trialIndex) {
     };
 }
 
+// Function to create feedback trial showing the correct answer
+function createFeedbackTrial(trialIndex) {
+    const trial = trialData[trialIndex];
+    
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+            const targetWord = trial.target_word;
+            return `
+                <div style="text-align: center; max-width: 600px; margin: 0 auto; padding: 40px;">
+                    <h2>Great job!</h2>
+                    <p style="font-size: 18px; margin: 30px 0;">The target word was:</p>
+                    <p style="font-size: 36px; font-weight: bold; margin: 30px 0;">${targetWord}</p>
+                    <p style="margin-top: 40px; font-size: 14px; color: #666;"><em>Press any key to continue</em></p>
+                </div>
+            `;
+        },
+        trial_duration: null
+    };
+}
+
 // Welcome screen
 const welcome = {
     type: jsPsychHtmlKeyboardResponse,
@@ -500,6 +521,7 @@ async function createTimeline() {
         timeline.push(createWordRevealTrial(i));
         timeline.push(createGuessInputTrial(i));
         timeline.push(createConfidenceRatingTrial(i));
+        timeline.push(createFeedbackTrial(i));
     }
     
     // Capture final score before data saving
