@@ -467,19 +467,22 @@ const examples = {
             
             <p>You might think that the target word is an object, but this is not a specific enough guess.</p>
             
-            <p>In the next case:</p>
+            <p>Let's reveal some more words!</p>
             
             <p style="margin-left: 20px; font-style: italic;">
                 "The glorp gleamed in the deng morning <strong>glosh</strong>."
             </p>
             
-            <p>Now you might have some better guesses about what this could be! Is it maybe sun? sunshine? air? light? <strong>Now you can make a guess.</strong></p>
-            
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid #ccc;">
-            
-            <p>If the word is just too difficult to be certain, the best guess you may have is that it is an animal, a color, a type of plant, etc. These are okay guesses, though they are not as good as the earlier ones.</p>
+            <p>Now you might have some better guesses about what <strong>glosh</strong> could be! Is it maybe sun? sunshine? air? light? </p>
+            <p> <strong>This is the right level of specificity for your guess. </strong></p>
 
-            <p>You should be able to narrow down the meaning so that you know more than just what part of speech it might be, or that it might be an object that can perform an action. <strong>Try and get as close as you can without losing too many points.</strong> </p>
+            <p>However! You might not be able to get this close every time:<p>
+                        
+            <p>Sometimes, the best guess you have might just be that it is that it is an animal, a color, a type of plant, etc. These are okay guesses, though they are not as good as the earlier ones.</p>
+
+            <p>You should be able to narrow down the meaning so that you know more than just what part of speech it might be, or that it might be an object that can perform an action. </p>
+            
+            <p><strong>Try and get as close as you can without losing too many points.</strong> </p>
             
             <p style="margin-top: 30px;"><em>Press any key to start</em></p>
         </div>
