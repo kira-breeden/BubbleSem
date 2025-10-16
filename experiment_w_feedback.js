@@ -472,7 +472,7 @@ const welcome = {
 };
 
 // Instructions
-const examples = {
+const examples_page1 = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
         <div style="max-width: 600px; margin: 0 auto; text-align: left;">
@@ -496,6 +496,17 @@ const examples = {
             
             <p>Now you might have some better guesses about what <strong>glosh</strong> could be! Is it maybe sun? sunshine? air? light? </p>
             <p> <strong>This is the right level of specificity for your guess. </strong></p>
+            
+            <p style="margin-top: 30px;"><em>Press any key to start</em></p>
+        </div>
+    `
+};
+
+const examples_page2 = {
+    type: jsPsychHtmlKeyboardResponse,
+    choices: ['q'],
+    stimulus: `
+        <div style="max-width: 600px; margin: 0 auto; text-align: left;">
 
             <p>However! You might not be able to get this close every time:<p>
                         
@@ -505,7 +516,7 @@ const examples = {
             
             <p><strong>Try and get as close as you can without losing too many points.</strong> </p>
             
-            <p style="margin-top: 30px;"><em>Press any key to start</em></p>
+            <p style="margin-top: 30px;"><em>Please let the experimenter know when you are ready to begin.</em></p>
         </div>
     `
 };
@@ -514,7 +525,7 @@ const examples = {
 async function createTimeline() {
     await loadTrialData();
     
-    let timeline = [welcome, examples];
+    let timeline = [welcome, examples_page1, examples_page2];
     
     // Add trials for each sentence (now in randomized order)
     for (let i = 0; i < trialData.length; i++) {
