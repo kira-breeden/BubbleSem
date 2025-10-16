@@ -6,7 +6,7 @@ let revealedWords = new Set();
 let startTime = null;
 let clickTimes = [];
 let randomSeed = null;
-let totalPoints = 250; // Starting points
+let totalPoints = 350; // Starting points
 const POINTS_PER_REVEAL = 2; // Points lost per word reveal
 let completedTrials = []; // Store completed trial data
 
@@ -444,31 +444,31 @@ const welcome = {
                 <li>Try to figure out what the <strong>bolded word</strong> means</li>
                 <li>Make your best guess when you're ready</li>
             </ul>
-            <p><strong>Scoring:</strong> You start with <strong>250 points</strong>. Each word you reveal costs <strong>${POINTS_PER_REVEAL} points</strong>. Try to keep as many points as possible!</p>
+            <p><strong>Scoring:</strong> You start with <strong>350 points</strong>. Each word you reveal costs <strong>${POINTS_PER_REVEAL} points</strong>. Try to keep as many points as possible!</p>
             <p><em>Press any key to continue</em></p>
         </div>
     `
 };
 
-// Instructions
-const instructions = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-        <div style="max-width: 600px; margin: 0 auto; text-align: left;">
-            <h2>Instructions</h2>
-            <p>On each trial:</p>
-            <ol>
-                <li>You'll see a sentence of nonsense words</li>
-                <li>One word will be <strong>bolded</strong> - this is your target word to guess</li>
-                <li>Click on other words to reveal their true meaning (<strong>${POINTS_PER_REVEAL} points each</strong>)</li>
-                <li>Remeber: Try to reveal as few words as possible!</li>
-                <li>Click "Make Guess" when you are ready to try and guess the word!</li>
-            </ol>
-            <p><strong>Remember:</strong> You start with 250 points. Your goal is to keep as many points as possible!</p>
-            <p><em>Press any key to start</em></p>
-        </div>
-    `
-};
+// // Instructions
+// const instructions = {
+//     type: jsPsychHtmlKeyboardResponse,
+//     stimulus: `
+//         <div style="max-width: 600px; margin: 0 auto; text-align: left;">
+//             <h2>Instructions</h2>
+//             <p>On each trial:</p>
+//             <ol>
+//                 <li>You'll see a sentence of nonsense words</li>
+//                 <li>One word will be <strong>bolded</strong> - this is your target word to guess</li>
+//                 <li>Click on other words to reveal their true meaning (<strong>${POINTS_PER_REVEAL} points each</strong>)</li>
+//                 <li>Remeber: Try to reveal as few words as possible!</li>
+//                 <li>Click "Make Guess" when you are ready to try and guess the word!</li>
+//             </ol>
+//             <p><strong>Remember:</strong> You start with 350 points. Your goal is to keep as many points as possible!</p>
+//             <p><em>Press any key to start</em></p>
+//         </div>
+//     `
+// };
 
 // Create timeline
 async function createTimeline() {
