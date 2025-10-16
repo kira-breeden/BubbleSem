@@ -478,9 +478,9 @@ const examples = {
 
             <p>However! You might not be able to get this close every time:<p>
                         
-            <p>Sometimes, the best guess you have might just be that it is that it is an animal, a color, a type of plant, etc. These are okay guesses, though they are not as good as the earlier ones.</p>
+            <p>Sometimes, your best guess might just be that it's an animal, a color, a type of plant, etc. These are okay guesses, though they are not as good as the earlier ones.</p>
 
-            <p>You should be able to narrow down the meaning so that you know more than just what part of speech it might be, or that it might be an object that can perform an action. </p>
+            <p>You should be able to narrow down the meaning more than just what part of speech it might be, or that it might be an object that moves. </p>
             
             <p><strong>Try and get as close as you can without losing too many points.</strong> </p>
             
