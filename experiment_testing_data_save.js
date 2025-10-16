@@ -451,7 +451,7 @@ const welcome = {
 };
 
 // Instructions
-const instructions = {
+const examples = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
         <div style="max-width: 600px; margin: 0 auto; text-align: left;">
@@ -492,7 +492,7 @@ const instructions = {
 async function createTimeline() {
     await loadTrialData();
     
-    let timeline = [welcome];
+    let timeline = [welcome, examples];
     
     // Add trials for each sentence (now in randomized order)
     for (let i = 0; i < trialData.length; i++) {
