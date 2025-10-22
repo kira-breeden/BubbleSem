@@ -10,7 +10,7 @@ sublist,seed,entropy,target_word,trial_number
 1,9,0.8125607,chest,9
 1,10,2.0965557,landscape,10
 1,11,2.9632952,paintings,11
-1,12,0.32084447,figure,12
+1,12,1.8663114,civilization,12
 1,13,1.2082415,fog,13
 1,14,4.006777,defendant,14
 1,15,1.5848396,years,15
@@ -30,7 +30,7 @@ sublist,seed,entropy,target_word,trial_number
 2,9,1.6668924,chest,9
 2,10,3.6288438,landscape,10
 2,11,3.8053875,paintings,11
-2,12,1.2952473,figure,12
+2,12,3.2015164,civilization,12
 2,13,1.7903212,fog,13
 2,14,4.006777,defendant,14
 2,15,1.6688384,years,15
@@ -50,7 +50,7 @@ sublist,seed,entropy,target_word,trial_number
 3,9,2.8843806,chest,9
 3,10,4.049487,landscape,10
 3,11,4.3319626,paintings,11
-3,12,1.5211961,figure,12
+3,12,3.4485295,civilization,12
 3,13,1.9457941,fog,13
 3,14,4.6591234,defendant,14
 3,15,1.8407437,years,15
@@ -70,7 +70,7 @@ sublist,seed,entropy,target_word,trial_number
 4,9,3.2785845,chest,9
 4,10,4.4466114,landscape,10
 4,11,4.3894305,paintings,11
-4,12,2.25561,figure,12
+4,12,4.2379756,civilization,12
 4,13,2.0409768,fog,13
 4,14,6.1473145,defendant,14
 4,15,1.9429593,years,15
