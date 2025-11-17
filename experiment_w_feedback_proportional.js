@@ -257,18 +257,6 @@ function createWordRevealTrial(trialIndex) {
     const trialNumber = trialIndex + 1;
     const originalTrialNumber = trial.trial_number || trialNumber;
     
-    // Count revealable words and calculate points per reveal for this trial
-    numRevealableWords = countRevealableWords(jabberTokens, realTokens, targetIndex);
-    
-    // Calculate points per reveal (100 / number of revealable words)
-    // Round to 2 decimal places for cleaner display
-    pointsPerReveal = numRevealableWords > 0 ? Math.round((100 / numRevealableWords) * 100) / 100 : 0;
-    
-    console.log(`Trial ${trialNumber}: ${numRevealableWords} revealable words, ${pointsPerReveal} points per reveal`);
-    
-    // Reset points for this trial
-    trialPoints = 100;
-    
     // Validation
     if (targetIndex < 0 || targetIndex >= jabberTokens.length) {
         console.error(`Invalid target index ${targetIndex} for trial ${originalTrialNumber}`);
@@ -281,6 +269,18 @@ function createWordRevealTrial(trialIndex) {
             revealedWords.clear();
             startTime = Date.now();
             clickTimes = [];
+            
+            // Reset points for this trial - MUST be in stimulus function so it runs each time
+            trialPoints = 100;
+            
+            // Count revealable words and calculate points per reveal for THIS trial
+            numRevealableWords = countRevealableWords(jabberTokens, realTokens, targetIndex);
+            
+            // Calculate points per reveal (100 / number of revealable words)
+            // Round to 2 decimal places for cleaner display
+            pointsPerReveal = numRevealableWords > 0 ? Math.round((100 / numRevealableWords) * 100) / 100 : 0;
+            
+            console.log(`Trial ${trialNumber}: ${numRevealableWords} revealable words, ${pointsPerReveal} points per reveal`);
             
             let html = `
                 <div style="position: relative;">
@@ -435,7 +435,7 @@ function createGuessInputTrial(trialIndex) {
             if (completedTrials[trialIndex]) {
                 completedTrials[trialIndex].guess = data.response.target_word_guess;
                 completedTrials[trialIndex].guess_correct = isCorrect;
-                completedTrials[trialIndex].guess_length = data.response.target_word_guess.length;
+                completedTrials[trialIndex].rt_guess = data.rt;
             }
         }
     };
@@ -443,73 +443,60 @@ function createGuessInputTrial(trialIndex) {
 
 // Function to create confidence rating trial
 function createConfidenceRatingTrial(trialIndex) {
+    const trial = trialData[trialIndex];
     const trialNumber = trialIndex + 1;
+    const originalTrialNumber = trial.trial_number || trialNumber;
     
     return {
         type: jsPsychHtmlButtonResponse,
         stimulus: `
-            <div style="max-width: 600px; margin: 0 auto; text-align: center;">
-                <p style="font-size: 18px; margin-bottom: 30px;">How confident are you in your guess?</p>
+            <div style="text-align: center;">
+                <p>How confident are you that you guessed the bolded word correctly?</p>
             </div>
         `,
-        choices: ['Not at all confident', 'Slightly confident', 'Moderately confident', 'Very confident', 'Extremely confident'],
+        choices: ['1<br>Not at all confident', '2<br>Slightly confident', '3<br>Moderately confident', '4<br>Very confident', '5<br>Extremely confident'],
         button_html: '<button class="jspsych-btn" style="margin: 10px; padding: 15px 25px; font-size: 16px;">%choice%</button>',
         on_finish: function(data) {
-            const confidenceLabels = ['Not at all confident', 'Slightly confident', 'Moderately confident', 'Very confident', 'Extremely confident'];
-            const confidenceRating = data.response + 1; // Convert 0-4 to 1-5
+            // Add confidence data to the stored trial object
+            completedTrials[trialIndex].confidence_rating = data.response + 1; // Convert 0-4 to 1-5
+            completedTrials[trialIndex].rt_confidence = data.rt;
             
-            // Add confidence data to completedTrials and copy all data to this trial
-            if (completedTrials[trialIndex]) {
-                completedTrials[trialIndex].confidence_rating = confidenceRating;
-                completedTrials[trialIndex].confidence_label = confidenceLabels[data.response];
-                
-                // Copy all data from completedTrials to this jsPsych data entry
-                Object.assign(data, completedTrials[trialIndex]);
+            // REPLACE all data properties with our completedTrials data
+            // First, get the keys from our completed trial
+            const trialData = completedTrials[trialIndex];
+            
+            // Clear existing data properties (except internal jsPsych ones)
+            const internalKeys = ['trial_type', 'trial_index', 'time_elapsed', 'internal_node_id'];
+            for (let key in data) {
+                if (!internalKeys.includes(key)) {
+                    delete data[key];
+                }
+            }
+            
+            // Now add our custom data
+            for (let key in trialData) {
+                data[key] = trialData[key];
             }
         }
     };
 }
 
-// Function to create feedback trial
+// Function to create feedback trial showing the correct answer
 function createFeedbackTrial(trialIndex) {
     const trial = trialData[trialIndex];
-    const trialNumber = trialIndex + 1;
     
     return {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function() {
-            const trialData = completedTrials[trialIndex];
-            const isCorrect = trialData ? trialData.guess_correct : false;
-            const guess = trialData ? trialData.guess : '';
-            const pointsEarned = trialData ? Math.round(trialData.points_remaining) : 0;
-            
-            let feedbackHtml = `
-                <div style="max-width: 600px; margin: 0 auto; text-align: center;">
-                    <h2>${isCorrect ? '✓ Correct!' : '✗ Incorrect'}</h2>
-                    <p style="font-size: 18px; margin: 20px 0;">
-                        The target word was: <strong>${trial.target_word}</strong>
-                    </p>
-            `;
-            
-            if (!isCorrect) {
-                feedbackHtml += `
-                    <p style="font-size: 16px; color: #666;">
-                        Your guess: <em>${guess}</em>
-                    </p>
-                `;
-            }
-            
-            feedbackHtml += `
-                    <p style="font-size: 20px; font-weight: bold; color: ${pointsEarned > 50 ? '#4caf50' : '#ff9800'}; margin: 30px 0;">
-                        Points earned this trial: ${pointsEarned}
-                    </p>
-                    <p style="margin-top: 40px; color: #666;">
-                        Press any key to continue
-                    </p>
+            const targetWord = trial.target_word;
+            return `
+                <div style="text-align: center; max-width: 600px; margin: 0 auto; padding: 40px;">
+                    <h2>Great job!</h2>
+                    <p style="font-size: 18px; margin: 30px 0;">The target word was:</p>
+                    <p style="font-size: 36px; font-weight: bold; margin: 30px 0;">${targetWord}</p>
+                    <p style="margin-top: 40px; font-size: 14px; color: #666;"><em>Press any key to continue</em></p>
                 </div>
             `;
-            
-            return feedbackHtml;
         },
         trial_duration: null
     };
