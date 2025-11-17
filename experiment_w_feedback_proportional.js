@@ -514,7 +514,7 @@ const welcome = {
                 <li>Try to figure out what the <strong>bolded word</strong> means</li>
                 <li>Make your best guess when you're ready</li>
             </ul>
-            <p><strong>Scoring:</strong> Each trial starts with <strong>100 points</strong>. Each word you reveal will cost you points - the more words available to reveal, the fewer points each reveal costs. Try to guess with as few reveals as possible!</p>
+            <p><strong>Scoring:</strong> Each trial starts with <strong>100 points</strong>. Each word you reveal will cost you points. Try to guess with as few reveals as possible!</p>
             <p><em>Press any key to continue</em></p>
         </div>
     `
@@ -563,7 +563,7 @@ const examples_page2 = {
 
             <p>You should be able to narrow down the meaning more than just what part of speech it might be, or that it might be an object that moves. </p>
             
-            <p><strong>Try and get as close as you can without losing too many points.</strong> </p>
+            <p><strong>Try and get as close as you can without losing too many points. We are looking for one word answers. </strong> </p>
             
             <p style="margin-top: 30px;"><em>Please let the experimenter know when you are ready to begin.</em></p>
         </div>
