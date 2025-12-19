@@ -613,7 +613,7 @@ const welcome = {
             <ul>
                 <li>Click on words to reveal their true meaning -- try not to click on too many!</li>
                 <li>Try to figure out what the <strong>bolded word</strong> means</li>
-                <li>Make your best guess when you're ready</li>
+                <li>Make your best ONE WORD guess when you're ready</li>
             </ul>
             <p><strong>Scoring:</strong> Each trial starts with <strong>100 points</strong>. Each word you reveal will cost you points. Try to guess with as few reveals as possible!</p>
             <p><em>Press any key to continue</em></p>
@@ -661,9 +661,9 @@ const examples_page2 = {
                         
             <p>Sometimes, your best guess might just be that it's an animal, a color, a type of plant, etc. These are okay guesses, though they are not as good as the earlier ones.</p>
 
-            <p>You should be able to narrow down the meaning more than just what part of speech it might be, or that it might be an object that moves. </p>
+            <p>You should be able to narrow down the meaning to a ONE WORD GUESS. </p>
             
-            <p><strong>Try and get as close as you can without losing too many points. We are looking for one word answers. </strong> </p>
+            <p><strong>Try and get as close as you can without losing too many points. </strong> </p>
             
             <p style="margin-top: 30px;"><em>Press any key to move on</em></p>
         </div>
@@ -792,7 +792,8 @@ async function createTimeline(sublistNum) {
                 <div style="text-align: center;">
                     <h2>Thank you and great job!</h2>
                     <p><strong>Total Score: ${totalScore} / ${maxPossibleScore} points (${scorePercentage}%)</strong></p>
-                    <p>Please click the link below to complete the experiment. <strong> YOU WILL RECEIVE YOUR MTURK HIIT AT THE END OF THE SURVEY </strong></p>
+                    <p>Please click the link below to complete the experiment. </p>
+                    <p> <strong> YOU WILL RECEIVE YOUR MTURK COMPLETION CODE AT THE END OF THE SURVEY </strong></p>
                     <p style="margin-top: 30px;">
                         <a href="${surveyWithParams}" target="_blank" style="font-size: 18px; padding: 15px 30px; background-color: #2196f3; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">
                             Go to Survey
