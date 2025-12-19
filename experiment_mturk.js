@@ -753,7 +753,7 @@ async function createTimeline(sublistNum) {
 async function createExperiment() {
     try {
         console.log('Getting condition assignment from datapipe...');
-        const condition = await jsPsychPipe.getCondition("6sUXv8MJL3e6");
+        const condition = await jsPsychPipe.getCondition("Fw7oHVxjxLtr");
         console.log('Received condition:', condition);
         
         // Map condition (0-3) to sublist (1-4)
