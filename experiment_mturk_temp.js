@@ -433,64 +433,71 @@ function createGuessInputTrial(trialIndex) {
             }
         ],
         on_start: function() {
-            // This runs before the question renders
             console.log('on_start fired');
         },
         on_load: function() {
             console.log('on_load fired');
             
-            // Use MutationObserver to watch for the input element being created
-            const observer = new MutationObserver(function(mutations) {
-                const inputElement = document.querySelector('input[name="target_word_guess"]');
+            // Function to find and block paste on the input/textarea
+            const findAndBlockPaste = function() {
+                // Try multiple selectors
+                let inputElement = document.querySelector('input[name="target_word_guess"]');
+                if (!inputElement) {
+                    inputElement = document.querySelector('textarea[name="target_word_guess"]');
+                }
+                if (!inputElement) {
+                    inputElement = document.querySelector('.jspsych-survey-text input');
+                }
+                if (!inputElement) {
+                    inputElement = document.querySelector('.jspsych-survey-text textarea');
+                }
+                
+                console.log('Searching for input element...', inputElement ? 'FOUND!' : 'not found');
                 
                 if (inputElement && !inputElement.hasAttribute('data-paste-blocked')) {
-                    console.log('Input element found! Attaching paste blocking...');
+                    console.log('*** ATTACHING PASTE BLOCKING TO ELEMENT ***');
+                    console.log('Element type:', inputElement.tagName);
+                    console.log('Element name:', inputElement.name);
                     
-                    // Mark it so we don't attach multiple times
+                    // Mark it
                     inputElement.setAttribute('data-paste-blocked', 'true');
                     
                     // Method 1: Block paste event
                     inputElement.addEventListener('paste', function(e) {
-                        console.log('PASTE EVENT BLOCKED');
+                        console.log('🚫 PASTE EVENT BLOCKED!');
                         e.preventDefault();
-                        e.stopPropagation();
-                        inputElement.style.border = '3px solid red';
+                        e.stopImmediatePropagation();
+                        this.style.border = '3px solid red';
                         setTimeout(() => {
-                            inputElement.style.border = '';
+                            this.style.border = '';
                         }, 1000);
                         alert('Pasting is not allowed. Please type your answer.');
                         return false;
-                    }, true); // Use capture phase
+                    }, {capture: true, passive: false});
                     
                     // Method 2: Block keyboard shortcuts
                     inputElement.addEventListener('keydown', function(e) {
                         if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V' || e.keyCode === 86)) {
-                            console.log('CTRL/CMD+V BLOCKED');
+                            console.log('🚫 CTRL/CMD+V BLOCKED!');
                             e.preventDefault();
-                            e.stopPropagation();
-                            inputElement.style.border = '3px solid red';
+                            e.stopImmediatePropagation();
+                            this.style.border = '3px solid red';
                             setTimeout(() => {
-                                inputElement.style.border = '';
+                                this.style.border = '';
                             }, 1000);
                             alert('Pasting is not allowed. Please type your answer.');
                             return false;
                         }
-                    }, true); // Use capture phase
+                    }, {capture: true, passive: false});
                     
-                    // Method 3: Context menu blocking (right-click)
-                    inputElement.addEventListener('contextmenu', function(e) {
-                        console.log('Right-click detected on input');
-                        // Don't block context menu, but the paste event will catch it
-                    });
-                    
-                    // Method 4: Input monitoring as backup
+                    // Method 3: Input monitoring
                     let lastValue = '';
                     inputElement.addEventListener('input', function(e) {
                         const currentValue = this.value;
                         const added = currentValue.length - lastValue.length;
                         
                         if (added > 2) {
-                            console.log('Suspected paste via rapid input change');
+                            console.log('🚫 RAPID INPUT DETECTED - BLOCKING!');
                             this.value = lastValue;
                             this.style.border = '3px solid red';
                             setTimeout(() => {
@@ -502,32 +509,47 @@ function createGuessInputTrial(trialIndex) {
                         lastValue = this.value;
                     });
                     
-                    console.log('All paste blocking methods attached!');
+                    console.log('✅ All paste blocking attached successfully!');
+                    return true;
+                }
+                return false;
+            };
+            
+            // Try immediately
+            if (findAndBlockPaste()) {
+                console.log('Immediate attachment successful');
+                return;
+            }
+            
+            // Use MutationObserver
+            let attached = false;
+            const observer = new MutationObserver(function(mutations) {
+                if (!attached && findAndBlockPaste()) {
+                    attached = true;
+                    observer.disconnect();
+                    console.log('MutationObserver attachment successful');
                 }
             });
             
-            // Start observing the document body for changes
             observer.observe(document.body, {
                 childList: true,
                 subtree: true
             });
             
-            // Also try direct attachment after delays
-            setTimeout(() => {
-                const inputElement = document.querySelector('input[name="target_word_guess"]');
-                if (inputElement) {
-                    console.log('Direct attachment attempt after 200ms');
-                    observer.disconnect();
-                }
-            }, 200);
-            
-            setTimeout(() => {
-                const inputElement = document.querySelector('input[name="target_word_guess"]');
-                if (inputElement) {
-                    console.log('Direct attachment attempt after 500ms');
-                    observer.disconnect();
-                }
-            }, 500);
+            // Also try with delays
+            const delays = [100, 200, 300, 500, 800, 1000];
+            delays.forEach(delay => {
+                setTimeout(() => {
+                    if (!attached) {
+                        console.log(`Retry attempt at ${delay}ms`);
+                        if (findAndBlockPaste()) {
+                            attached = true;
+                            observer.disconnect();
+                            console.log(`Attachment successful at ${delay}ms`);
+                        }
+                    }
+                }, delay);
+            });
         },
         on_finish: function(data) {
             const guess = data.response.target_word_guess.toLowerCase().trim().replace(/[.,!?]/g, '');
