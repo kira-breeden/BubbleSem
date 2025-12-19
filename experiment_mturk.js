@@ -10,8 +10,6 @@ let trialPoints = 100; // Points per trial (resets each trial)
 let pointsPerReveal = 0; // Calculated based on revealable words in current trial
 let numRevealableWords = 0; // Number of words that can be revealed in current trial
 let completedTrials = []; // Store completed trial data
-let sublistNumber = 1; // Will be set by condition assignment
-let totalScore = 0;
 
 // Articles that should not be obscured
 const articles = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
@@ -45,25 +43,37 @@ class SeededRandom {
     }
 }
 
-// Get random seed from URL parameter (for trial randomization)
-const seedParam = getURLParameter('seed');
-if (seedParam) {
-    randomSeed = parseInt(seedParam);
-    if (isNaN(randomSeed)) {
-        // If seed is not a number, convert string to number
-        randomSeed = seedParam.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    }
-} else {
-    // Generate random seed if not provided
-    randomSeed = Math.floor(Math.random() * 1000000);
-}
+// Determine which sublist to use - will be set by datapipe
+let sublistNumber = 1; // default, will be overridden by datapipe
+
+// Generate random seed for trial randomization
+randomSeed = Math.floor(Math.random() * 1000000);
+
+console.log(`Random seed generated: ${randomSeed}`);
 
 // Initialize jsPsych
 const jsPsych = initJsPsych({});
 
-// Initialize filename based on subjCode
-const subjCode = getURLParameter('subjCode');
+// Initialize filename based on workerId (stored as subjCode in data)
+const workerId = getURLParameter('workerId');
+const subjCode = workerId; // Store as subjCode for consistency in data
+
+// Validate that workerId was provided
+if (!workerId) {
+    console.error('No workerId provided in URL parameters');
+    document.body.innerHTML = `
+        <div style="text-align: center; padding: 50px;">
+            <h2>Missing Participant ID</h2>
+            <p>No workerId parameter found in the URL.</p>
+            <p>Please ensure you're accessing this experiment through the proper link.</p>
+        </div>
+    `;
+    throw new Error('workerId parameter is required');
+}
+
 const filename = `${subjCode}.csv`;
+
+console.log(`Worker ID: ${workerId} (saved as subjCode: ${subjCode})`);
 
 // Function to update points display
 function updatePointsDisplay(points) {
@@ -82,56 +92,94 @@ function updatePointsDisplay(points) {
 function tokenizeSentence(sentence) {
     // Split on spaces and punctuation, keeping punctuation as separate tokens
     const tokens = [];
-    const regex = /(\s+|[.,!?;:'"()])/g;
-    const parts = sentence.split(regex);
+    const words = sentence.split(' ');
     
-    for (let part of parts) {
-        if (part && part.trim() !== '') {
-            tokens.push(part);
+    words.forEach(word => {
+        // Match word and trailing punctuation separately
+        const match = word.match(/^([^.,!?;:'"]*)([.,!?;:'"]*)$/);
+        if (match) {
+            const [, wordPart, punctPart] = match;
+            if (wordPart) tokens.push(wordPart);
+            if (punctPart) {
+                // Add each punctuation mark as separate token
+                punctPart.split('').forEach(p => tokens.push(p));
+            }
+        } else {
+            tokens.push(word);
         }
-    }
+    });
     
     return tokens;
 }
 
-// Function to parse word_to_nonce mapping
-function parseWordToNonce(trial) {
-    let mapping = {};
+// Function to find target word index in tokenized sentence
+function findTargetWordIndex(tokens, targetWord, targetWordPosition) {
+    const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
     
-    if (trial.word_to_nonce) {
-        try {
-            // Handle both JSON string and object
-            if (typeof trial.word_to_nonce === 'string') {
-                mapping = JSON.parse(trial.word_to_nonce);
-            } else {
-                mapping = trial.word_to_nonce;
+    // If targetWordPosition is provided and valid, use it to find the nth word token
+    if (targetWordPosition !== null && targetWordPosition !== undefined && targetWordPosition !== '') {
+        const posNum = typeof targetWordPosition === 'string' ? parseInt(targetWordPosition) : targetWordPosition;
+        
+        if (!isNaN(posNum) && posNum >= 0) {
+            let wordCount = 0;
+            for (let i = 0; i < tokens.length; i++) {
+                // Skip punctuation tokens
+                if (!/^[.,!?;:'"]$/.test(tokens[i])) {
+                    if (wordCount === posNum) {
+                        return i;
+                    }
+                    wordCount++;
+                }
             }
-        } catch (e) {
-            console.warn('Could not parse word_to_nonce:', e);
+            console.warn(`Could not find word at position ${posNum}, falling back to text search`);
         }
     }
     
-    return mapping;
-}
-
-// Function to find target word index in sentence
-function findTargetWordIndex(words, targetWord, targetPos) {
-    // If targetPos is a number, use it directly
-    if (typeof targetPos === 'number' && targetPos >= 0 && targetPos < words.length) {
-        return targetPos;
-    }
-    
-    // Otherwise, search for the target word
-    for (let i = 0; i < words.length; i++) {
-        const cleanWord = words[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
-        const cleanTarget = targetWord.toLowerCase().replace(/[.,!?;:'"]/g, '');
-        if (cleanWord === cleanTarget) {
-            return i;
+    // Fall back to searching for the target word by text
+    for (let i = 0; i < tokens.length; i++) {
+        // Skip punctuation tokens
+        if (!/^[.,!?;:'"]$/.test(tokens[i])) {
+            const cleanToken = tokens[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
+            if (cleanToken === cleanTarget) {
+                return i;
+            }
         }
     }
     
     console.error(`Could not find target word '${targetWord}' in sentence`);
     return -1;
+}
+
+// Function to count revealable words in a trial
+function countRevealableWords(jabberTokens, realTokens, targetIndex) {
+    let count = 0;
+    
+    for (let index = 0; index < jabberTokens.length; index++) {
+        const token = jabberTokens[index];
+        
+        // Skip punctuation
+        if (/^[.,!?;:'"]$/.test(token)) {
+            continue;
+        }
+        
+        // Skip target word
+        if (index === targetIndex) {
+            continue;
+        }
+        
+        const cleanJabber = token.toLowerCase().replace(/[.,!?;:'"]/g, '');
+        const cleanReal = index < realTokens.length ? realTokens[index].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
+        
+        // Skip articles and words that are the same in both versions
+        if (articles.includes(cleanJabber) || articles.includes(cleanReal) || cleanJabber === cleanReal) {
+            continue;
+        }
+        
+        // This is a revealable word
+        count++;
+    }
+    
+    return count;
 }
 
 // Function to load and randomize CSV data
@@ -169,7 +217,7 @@ function loadTrialData(sublistNum) {
                 trialData = rng.shuffle(originalData);
                 
                 console.log(`Successfully loaded ${trialData.length} trials from sublist ${sublistNum}`);
-                console.log(`Randomized with seed ${randomSeed}`);
+                console.log(`Trials randomized with seed: ${randomSeed}`);
                 
                 // Log first few for debugging
                 console.log('First trial structure:', trialData[0]);
@@ -184,27 +232,6 @@ function loadTrialData(sublistNum) {
     });
 }
 
-// Function to count revealable words in a trial
-function countRevealableWords(realWords, jabberWords, targetIndex) {
-    let count = 0;
-    
-    for (let i = 0; i < jabberWords.length; i++) {
-        if (i === targetIndex) continue;
-        
-        const cleanJabber = jabberWords[i].toLowerCase().replace(/[.,!?;:'"]/g, '');
-        const cleanReal = i < realWords.length ? realWords[i].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
-        
-        // Skip if it's an article or if the words are the same
-        if (articles.includes(cleanJabber) || articles.includes(cleanReal) || cleanJabber === cleanReal) {
-            continue;
-        }
-        
-        count++;
-    }
-    
-    return count;
-}
-
 // Function to create word reveal trial
 function createWordRevealTrial(trialIndex) {
     const trial = trialData[trialIndex];
@@ -213,47 +240,22 @@ function createWordRevealTrial(trialIndex) {
     const realSentence = trial.passage_variant || trial.ground_truth_sentence || '';
     const jabberSentence = trial.jabber_passage || trial.nonsense_sentence || '';
     
-    const realWords = realSentence.split(' ');
-    const jabberWords = jabberSentence.split(' ');
+    // Tokenize sentences (separating words and punctuation)
+    const realTokens = tokenizeSentence(realSentence);
+    const jabberTokens = tokenizeSentence(jabberSentence);
     
     // Get target word and find its position
     const targetWord = trial.target_word;
-    const targetPos = trial.target_pos || trial.target_word_index;
-    const targetIndex = findTargetWordIndex(realWords, targetWord, targetPos);
+    const targetWordPosition = trial.target_word_position; // Added by preprocessing script
     
-    const trialNumber = trialIndex + 1; // Use position in randomized order
+    const targetIndex = findTargetWordIndex(jabberTokens, targetWord, targetWordPosition);
+    
+    const trialNumber = trialIndex + 1;
     const originalTrialNumber = trial.trial_number || trialNumber;
     
-    // Calculate revealable words and points per reveal
-    numRevealableWords = countRevealableWords(realWords, jabberWords, targetIndex);
-    pointsPerReveal = numRevealableWords > 0 ? trialPoints / numRevealableWords : 0;
-    
-    console.log(`Trial ${trialNumber}: ${numRevealableWords} revealable words, ${pointsPerReveal.toFixed(2)} points per reveal`);
-    
-    // Get word-to-nonce mapping
-    const wordToNonce = parseWordToNonce(trial);
-    
-    // Debug logging
-    console.log(`Trial ${trialNumber}:`, {
-        targetWord,
-        targetPos,
-        targetIndex,
-        realWordsCount: realWords.length,
-        jabberWordsCount: jabberWords.length,
-        targetInReal: realWords[targetIndex],
-        targetInJabber: jabberWords[targetIndex],
-        numRevealableWords,
-        pointsPerReveal
-    });
-    
     // Validation
-    if (targetIndex < 0 || targetIndex >= realWords.length) {
+    if (targetIndex < 0 || targetIndex >= jabberTokens.length) {
         console.error(`Invalid target index ${targetIndex} for trial ${originalTrialNumber}`);
-    }
-    
-    // Verify word counts match
-    if (realWords.length !== jabberWords.length) {
-        console.warn(`Word count mismatch: real=${realWords.length}, jabber=${jabberWords.length}`);
     }
     
     return {
@@ -263,44 +265,64 @@ function createWordRevealTrial(trialIndex) {
             revealedWords.clear();
             startTime = Date.now();
             clickTimes = [];
-            trialPoints = 100; // Reset points at start of trial
+            
+            // Reset points for this trial - MUST be in stimulus function so it runs each time
+            trialPoints = 100;
+            
+            // Count revealable words and calculate points per reveal for THIS trial
+            numRevealableWords = countRevealableWords(jabberTokens, realTokens, targetIndex);
+            
+            // Calculate points per reveal (100 / number of revealable words)
+            // Round to 2 decimal places for cleaner display
+            pointsPerReveal = numRevealableWords > 0 ? Math.round((100 / numRevealableWords) * 100) / 100 : 0;
+            
+            console.log(`Trial ${trialNumber}: ${numRevealableWords} revealable words, ${pointsPerReveal} points per reveal`);
             
             let html = `
-                <div class="trial-counter">Trial ${trialNumber} of ${trialData.length}</div>
-                <div class="instructions">
-                    <p>Click on words to reveal their true meaning. The <strong>bolded word</strong> cannot be revealed - try to guess what it is based on the other words you reveal.</p>
-                    <p>When you're ready to guess the bolded word, click "Make Guess".</p>
-                    <p style="font-size: 14px; color: #666; margin-top: 10px;"><em>Note: Each word you reveal reduces your points for this trial</em></p>
-                </div>
-                <div class="points-counter" id="points-counter">Trial Points: 100</div>
-                <div class="sentence-container" id="sentence-container">
+                <div style="position: relative;">
+                    <div class="trial-counter">Trial ${trialNumber} of ${trialData.length}</div>
+                    <div class="points-counter" id="points-counter">Trial Points: ${trialPoints}</div>
+                    <div class="sentence-container" id="sentence-container">
             `;
             
-            // Build sentence word by word
-            for (let index = 0; index < jabberWords.length; index++) {
-                let wordClass = 'word';
-                let displayWord = jabberWords[index];
+            // Build sentence token by token
+            for (let index = 0; index < jabberTokens.length; index++) {
+                const token = jabberTokens[index];
                 
-                // Clean word for comparison (remove punctuation)
-                const cleanJabber = jabberWords[index].toLowerCase().replace(/[.,!?;:'"]/g, '');
-                const cleanReal = index < realWords.length ? realWords[index].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
+                // Check if this token is punctuation
+                if (/^[.,!?;:'"]$/.test(token)) {
+                    // Punctuation - just display it without any special styling
+                    html += token;
+                    // Add space after certain punctuation
+                    if (/[.,!?;:]/.test(token) && index < jabberTokens.length - 1) {
+                        html += ' ';
+                    }
+                    continue;
+                }
+                
+                let wordClass = 'word';
+                let displayWord = token;
+                
+                // Clean token for comparison
+                const cleanJabber = token.toLowerCase().replace(/[.,!?;:'"]/g, '');
+                const cleanReal = index < realTokens.length ? realTokens[index].toLowerCase().replace(/[.,!?;:'"]/g, '') : '';
                 
                 if (index === targetIndex) {
-                    // This is the target word - keep it as jabberwocky and make it bold
+                    // This is the target word
                     wordClass += ' target';
-                    displayWord = jabberWords[index];
+                    displayWord = token;
                 } else if (articles.includes(cleanJabber) || articles.includes(cleanReal)) {
                     // This is an article - show the real word
                     wordClass += ' article';
-                    displayWord = realWords[index];
+                    displayWord = realTokens[index];
                 } else if (cleanJabber === cleanReal) {
-                    // Word is the same in both (likely punctuation or article) - show real
+                    // Word is the same in both - show real
                     wordClass += ' article';
-                    displayWord = realWords[index];
+                    displayWord = realTokens[index];
                 } else {
                     // Regular word - can be clicked to reveal
                     wordClass += ' clickable';
-                    displayWord = jabberWords[index];
+                    displayWord = token;
                 }
                 
                 html += `<span class="${wordClass}" data-index="${index}">${displayWord}</span>`;
@@ -310,6 +332,7 @@ function createWordRevealTrial(trialIndex) {
                 </div>
                 <div class="controls">
                     <button class="guess-button" id="guess-btn">Make Guess</button>
+                </div>
                 </div>
             `;
             
@@ -327,16 +350,17 @@ function createWordRevealTrial(trialIndex) {
                         
                         // Deduct points proportionally
                         trialPoints -= pointsPerReveal;
+                        // Ensure points don't go below 0
+                        trialPoints = Math.max(0, trialPoints);
                         updatePointsDisplay(trialPoints);
                         
                         clickTimes.push({
                             word_index: index,
-                            revealed_word: realWords[index],
-                            time_from_start: Date.now() - startTime,
-                            points_remaining: trialPoints
+                            revealed_word: realTokens[index],
+                            time_from_start: Date.now() - startTime
                         });
                         
-                        this.textContent = realWords[index];
+                        this.textContent = realTokens[index];
                         this.classList.remove('clickable');
                         this.classList.add('revealed');
                     }
@@ -344,35 +368,34 @@ function createWordRevealTrial(trialIndex) {
             });
             
             document.getElementById('guess-btn').addEventListener('click', function() {
-                // Store trial data before finishing
-                const trialDataToStore = {
-                    trial_type: 'word-reveal',
+                // Filter out punctuation from revealed words
+                const revealedWordsList = Array.from(revealedWords)
+                    .filter(idx => !/^[.,!?;:'"]$/.test(realTokens[idx]))
+                    .map(idx => realTokens[idx]);
+                
+                // Store word-reveal data in completedTrials array
+                completedTrials[trialIndex] = {
                     trial_number: trialNumber,
-                    original_trial_number: originalTrialNumber,
-                    randomization_position: trialIndex + 1,
+                    subjCode: subjCode,
                     sublist: sublistNumber,
                     random_seed: randomSeed,
-                    target_word_index: targetIndex,
                     target_word: trial.target_word,
+                    target_word_position: trial.target_word_position || targetIndex,
                     entropy: trial.entropy,
                     target_probability: trial.target_probability,
-                    revealed_words: Array.from(revealedWords).map(idx => realWords[idx]),
-                    revealed_word_indices: Array.from(revealedWords),
-                    click_times: clickTimes,
-                    total_time_before_guess: Date.now() - startTime,
-                    num_words_revealed: revealedWords.size,
-                    num_revealable_words: numRevealableWords,
-                    points_per_reveal: pointsPerReveal,
-                    points_remaining: Math.max(0, trialPoints),
                     jabber_sentence: jabberSentence,
                     real_sentence: realSentence,
-                    subjCode: subjCode
+                    num_words_revealed: revealedWordsList.length,
+                    num_revealable_words: numRevealableWords,
+                    points_per_reveal: pointsPerReveal,
+                    revealed_words: JSON.stringify(revealedWordsList),
+                    revealed_word_indices: JSON.stringify(Array.from(revealedWords)),
+                    click_times: JSON.stringify(clickTimes),
+                    total_time_before_guess: Date.now() - startTime,
+                    points_remaining: Math.round(trialPoints * 100) / 100, // Round to 2 decimal places
                 };
                 
-                // Store this in completedTrials array
-                completedTrials[trialIndex] = trialDataToStore;
-                
-                jsPsych.finishTrial({});
+                jsPsych.finishTrial();
             });
         },
         trial_duration: null,
@@ -380,11 +403,10 @@ function createWordRevealTrial(trialIndex) {
     };
 }
 
-// Function to create guess input trial with paste blocking and single-word validation
+// Function to create guess input trial
 function createGuessInputTrial(trialIndex) {
     const trial = trialData[trialIndex];
     const trialNumber = trialIndex + 1;
-    const originalTrialNumber = trial.trial_number || trialNumber;
     
     return {
         type: jsPsychSurveyText,
@@ -392,7 +414,7 @@ function createGuessInputTrial(trialIndex) {
             {
                 prompt: `<div class="instructions">
                     <p>What do you think the <strong>bolded word</strong> was in the sentence?</p>
-                    <p>Type your guess below (single word only, no pasting):</p>
+                    <p>Type your guess below:</p>
                 </div>`,
                 name: 'target_word_guess',
                 required: true,
@@ -401,41 +423,26 @@ function createGuessInputTrial(trialIndex) {
             }
         ],
         on_load: function() {
-            // Get the input element
+            // Get the input element and disable paste
             const inputElement = document.querySelector('input[name="target_word_guess"]');
             
             if (inputElement) {
-                // Disable paste
                 inputElement.addEventListener('paste', function(e) {
                     e.preventDefault();
                     alert('Pasting is not allowed. Please type your answer.');
                 });
-                
-                // Add visual indicator that paste is disabled
-                inputElement.setAttribute('title', 'Pasting is disabled - please type your answer');
             }
         },
         on_finish: function(data) {
-            const rawGuess = data.response.target_word_guess;
-            const guess = rawGuess.toLowerCase().trim().replace(/[.,!?]/g, '');
+            const guess = data.response.target_word_guess.toLowerCase().trim().replace(/[.,!?]/g, '');
             const correct = trial.target_word.toLowerCase().trim().replace(/[.,!?]/g, '');
             const isCorrect = guess === correct;
             
-            // Check if guess contains multiple words (contains whitespace)
-            const hasMultipleWords = /\s/.test(rawGuess.trim());
-            
             // Add guess data to completedTrials
             if (completedTrials[trialIndex]) {
-                completedTrials[trialIndex].guess = rawGuess;
-                completedTrials[trialIndex].guess_cleaned = guess;
+                completedTrials[trialIndex].guess = data.response.target_word_guess;
                 completedTrials[trialIndex].guess_correct = isCorrect;
-                completedTrials[trialIndex].guess_has_multiple_words = hasMultipleWords;
                 completedTrials[trialIndex].rt_guess = data.rt;
-            }
-            
-            // If multiple words detected, show warning (but still continue)
-            if (hasMultipleWords) {
-                console.warn(`Participant entered multiple words: "${rawGuess}"`);
             }
         }
     };
@@ -498,8 +505,7 @@ function createFeedbackTrial(trialIndex) {
                 </div>
             `;
         },
-        trial_duration: 3000, // Auto-advance after 3 seconds
-        response_ends_trial: true
+        trial_duration: null
     };
 }
 
@@ -508,39 +514,74 @@ const welcome = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
         <div style="max-width: 600px; margin: 0 auto; text-align: left;">
-            <h1>Word Reveal Experiment</h1>
             <p>In this experiment, you will see sentences with made-up nonsense words.</p>
             <p>Your task is to:</p>
             <ul>
-                <li>Click on words to reveal their true meaning</li>
+                <li>Click on words to reveal their true meaning -- try not to click on too many!</li>
                 <li>Try to figure out what the <strong>bolded word</strong> means</li>
                 <li>Make your best guess when you're ready</li>
             </ul>
-            <p><strong>Important:</strong> You'll earn points for each trial. Revealing fewer words gives you more points!</p>
-            <p><strong>If you cannot narrow down your guess to ONE WORD, you need to reveal more words. </strong></p>
-            <p>Note: The bolded word cannot be revealed - you must guess it based on context.</p>
+            <p><strong>Scoring:</strong> Each trial starts with <strong>100 points</strong>. Each word you reveal will cost you points. Try to guess with as few reveals as possible!</p>
             <p><em>Press any key to continue</em></p>
         </div>
     `
 };
 
 // Instructions
-const instructions = {
+const examples_page1 = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
         <div style="max-width: 600px; margin: 0 auto; text-align: left;">
-            <h2>Instructions</h2>
-            <p>On each trial:</p>
-            <ol>
-                <li>You'll see a sentence with nonsense words</li>
-                <li>One word will be <strong>bolded</strong> - this is your target word to guess</li>
-                <li>Click on other words to reveal their true meaning (but this costs points!)</li>
-                <li>When you think you know the bolded word, click "Make Guess"</li>
-                <li>Type your guess for the bolded word (single word only)</li>
-                <li>Rate your confidence</li>
-            </ol>
-            <p><strong>Scoring:</strong> You start with 100 points per trial. Each word you reveal reduces your points proportionally. Try to use as few reveals as possible!</p>
-            <p><em>Press any key to start</em></p>
+            <h2>When are you ready to guess?</h2>
+            
+            <p><strong>Do not guess the word if you have no idea what it might mean.</strong></p>
+            
+            <p>For example:</p>
+            
+            <p style="margin-left: 20px; font-style: italic;">
+                "The glorp tafed in the deng zirp <strong>glosh</strong>."
+            </p>
+            
+            <p>You might think that the target word is an object, but this is not a specific enough guess.</p>
+            
+            <p>Let's reveal some more words!</p>
+            
+            <p style="margin-left: 20px; font-style: italic;">
+                "The glorp gleamed in the deng morning <strong>glosh</strong>."
+            </p>
+            
+            <p>Now you might have some better guesses about what <strong>glosh</strong> could be! Is it maybe sun? sunshine? air? light? </p>
+            <p> <strong>This is the right level of specificity for your guess. </strong></p>
+            
+            <p style="margin-top: 30px;"><em>Press any key to continue</em></p>
+        </div>
+    `
+};
+
+const examples_page2 = {
+    type: jsPsychHtmlKeyboardResponse,
+    choices: ['q'],
+    stimulus: `
+        <div style="max-width: 600px; margin: 0 auto; text-align: left;">
+
+            <p>However! You might not be able to get this close every time:<p>
+                        
+            <p>Sometimes, your best guess might just be that it's an animal, a color, a type of plant, etc. These are okay guesses, though they are not as good as the earlier ones.</p>
+
+            <p>You should be able to narrow down the meaning more than just what part of speech it might be, or that it might be an object that moves. </p>
+            
+            <p><strong>Try and get as close as you can without losing too many points. We are looking for one word answers. </strong> </p>
+            
+            <p style="margin-top: 30px;"><em>Please let the experimenter know when you are ready to begin.</em></p>
+        </div>
+    `
+};
+
+const start_study = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+        <div style="max-width: 600px; margin: 0 auto; text-align: left;">
+            <h2>Press Any Key to Start Experiment</h2>
         </div>
     `
 };
@@ -549,7 +590,7 @@ const instructions = {
 async function createTimeline(sublistNum) {
     await loadTrialData(sublistNum);
     
-    let timeline = [welcome, instructions];
+    let timeline = [welcome, examples_page1, examples_page2, start_study];
     
     // Add trials for each sentence (now in randomized order)
     for (let i = 0; i < trialData.length; i++) {
@@ -559,7 +600,9 @@ async function createTimeline(sublistNum) {
         timeline.push(createFeedbackTrial(i));
     }
     
-    // Calculate and store total score
+    // Calculate total score across all trials
+    let totalScore = 0;
+    
     timeline.push({
         type: jsPsychHtmlKeyboardResponse,
         stimulus: '',
@@ -571,7 +614,7 @@ async function createTimeline(sublistNum) {
             }, 0);
             
             jsPsych.data.addProperties({
-                experiment_version: '2.0_proportional_datapipe',
+                experiment_version: '2.0_proportional',
                 sublist: sublistNumber,
                 random_seed: randomSeed,
                 subjCode: subjCode,
@@ -654,9 +697,10 @@ async function createTimeline(sublistNum) {
             return `
                 <div style="text-align: center;">
                     <h2>Thank you and great job!</h2>
+                    <p>You have completed the experiment.</p>
                     <p><strong>Total Score: ${totalScore} / ${maxPossibleScore} points (${scorePercentage}%)</strong></p>
                     <p>Your data has been saved.</p>
-                    <p>Click the link below to complete a brief survey. <strong>You will recieve your HIIT for this experiment AFTER COMPLETING THE SURVEY</strong></p>
+                    <p>Please click the link below to complete a brief survey:</p>
                     <p style="margin-top: 30px;">
                         <a href="${surveyWithId}" target="_blank" style="font-size: 18px; padding: 15px 30px; background-color: #2196f3; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">
                             Go to Survey
@@ -676,15 +720,16 @@ async function createTimeline(sublistNum) {
 // Main experiment function with datapipe condition assignment
 async function createExperiment() {
     try {
-        console.log('Getting condition from datapipe...');
+        console.log('Getting condition assignment from datapipe...');
         const condition = await jsPsychPipe.getCondition("6sUXv8MJL3e6");
         console.log('Received condition:', condition);
         
         // Map condition (0-3) to sublist (1-4)
         sublistNumber = condition + 1;
         
-        console.log(`Condition ${condition} -> Sublist ${sublistNumber}`);
-        console.log(`Using random seed: ${randomSeed}`);
+        console.log(`Condition ${condition} assigned → Loading Sublist ${sublistNumber}`);
+        console.log(`Participant: ${workerId} (subjCode: ${subjCode})`);
+        console.log(`Trial randomization seed: ${randomSeed}`);
         
         // Create timeline with the assigned sublist
         const timeline = await createTimeline(sublistNumber);
