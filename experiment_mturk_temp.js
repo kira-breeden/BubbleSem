@@ -432,36 +432,102 @@ function createGuessInputTrial(trialIndex) {
                 columns: 40
             }
         ],
+        on_start: function() {
+            // This runs before the question renders
+            console.log('on_start fired');
+        },
         on_load: function() {
-            // Get the input element and disable paste
-            const inputElement = document.querySelector('input[name="target_word_guess"]');
+            console.log('on_load fired');
             
-            if (inputElement) {
-                // Method 1: Block paste event (catches right-click paste, Edit menu paste)
-                inputElement.addEventListener('paste', function(e) {
-                    e.preventDefault();
-                    // Show red border briefly
-                    inputElement.style.border = '2px solid red';
-                    setTimeout(() => {
-                        inputElement.style.border = '';
-                    }, 1000);
-                    alert('Pasting is not allowed. Please type your answer.');
-                });
+            // Use MutationObserver to watch for the input element being created
+            const observer = new MutationObserver(function(mutations) {
+                const inputElement = document.querySelector('input[name="target_word_guess"]');
                 
-                // Method 2: Block Ctrl+V / Cmd+V keyboard shortcuts
-                inputElement.addEventListener('keydown', function(e) {
-                    // Check for Ctrl+V (Windows/Linux) or Cmd+V (Mac)
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                if (inputElement && !inputElement.hasAttribute('data-paste-blocked')) {
+                    console.log('Input element found! Attaching paste blocking...');
+                    
+                    // Mark it so we don't attach multiple times
+                    inputElement.setAttribute('data-paste-blocked', 'true');
+                    
+                    // Method 1: Block paste event
+                    inputElement.addEventListener('paste', function(e) {
+                        console.log('PASTE EVENT BLOCKED');
                         e.preventDefault();
-                        // Show red border briefly
-                        inputElement.style.border = '2px solid red';
+                        e.stopPropagation();
+                        inputElement.style.border = '3px solid red';
                         setTimeout(() => {
                             inputElement.style.border = '';
                         }, 1000);
                         alert('Pasting is not allowed. Please type your answer.');
-                    }
-                });
-            }
+                        return false;
+                    }, true); // Use capture phase
+                    
+                    // Method 2: Block keyboard shortcuts
+                    inputElement.addEventListener('keydown', function(e) {
+                        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V' || e.keyCode === 86)) {
+                            console.log('CTRL/CMD+V BLOCKED');
+                            e.preventDefault();
+                            e.stopPropagation();
+                            inputElement.style.border = '3px solid red';
+                            setTimeout(() => {
+                                inputElement.style.border = '';
+                            }, 1000);
+                            alert('Pasting is not allowed. Please type your answer.');
+                            return false;
+                        }
+                    }, true); // Use capture phase
+                    
+                    // Method 3: Context menu blocking (right-click)
+                    inputElement.addEventListener('contextmenu', function(e) {
+                        console.log('Right-click detected on input');
+                        // Don't block context menu, but the paste event will catch it
+                    });
+                    
+                    // Method 4: Input monitoring as backup
+                    let lastValue = '';
+                    inputElement.addEventListener('input', function(e) {
+                        const currentValue = this.value;
+                        const added = currentValue.length - lastValue.length;
+                        
+                        if (added > 2) {
+                            console.log('Suspected paste via rapid input change');
+                            this.value = lastValue;
+                            this.style.border = '3px solid red';
+                            setTimeout(() => {
+                                this.style.border = '';
+                            }, 1000);
+                            alert('Pasting is not allowed. Please type your answer.');
+                        }
+                        
+                        lastValue = this.value;
+                    });
+                    
+                    console.log('All paste blocking methods attached!');
+                }
+            });
+            
+            // Start observing the document body for changes
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            
+            // Also try direct attachment after delays
+            setTimeout(() => {
+                const inputElement = document.querySelector('input[name="target_word_guess"]');
+                if (inputElement) {
+                    console.log('Direct attachment attempt after 200ms');
+                    observer.disconnect();
+                }
+            }, 200);
+            
+            setTimeout(() => {
+                const inputElement = document.querySelector('input[name="target_word_guess"]');
+                if (inputElement) {
+                    console.log('Direct attachment attempt after 500ms');
+                    observer.disconnect();
+                }
+            }, 500);
         },
         on_finish: function(data) {
             const guess = data.response.target_word_guess.toLowerCase().trim().replace(/[.,!?]/g, '');
