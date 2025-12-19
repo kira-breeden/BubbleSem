@@ -433,125 +433,66 @@ function createGuessInputTrial(trialIndex) {
             }
         ],
         on_start: function() {
-            console.log('on_start fired');
-        },
-        on_load: function() {
-            console.log('on_load fired');
+            console.log('Guess input trial starting - setting up GLOBAL paste blocking');
             
-            // Function to find and block paste on the input/textarea
-            const findAndBlockPaste = function() {
-                // Try multiple selectors
-                let inputElement = document.querySelector('input[name="target_word_guess"]');
-                if (!inputElement) {
-                    inputElement = document.querySelector('textarea[name="target_word_guess"]');
+            // Remove any existing listeners first
+            if (window.pasteBlockHandler) {
+                document.removeEventListener('paste', window.pasteBlockHandler, true);
+            }
+            if (window.keydownBlockHandler) {
+                document.removeEventListener('keydown', window.keydownBlockHandler, true);
+            }
+            
+            // Create global paste blocker
+            window.pasteBlockHandler = function(e) {
+                // Check if we're in a text input
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    console.log('🚫 GLOBAL PASTE EVENT BLOCKED!');
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    e.target.style.border = '3px solid red';
+                    setTimeout(() => {
+                        e.target.style.border = '';
+                    }, 1000);
+                    alert('Pasting is not allowed. Please type your answer.');
+                    return false;
                 }
-                if (!inputElement) {
-                    inputElement = document.querySelector('.jspsych-survey-text input');
-                }
-                if (!inputElement) {
-                    inputElement = document.querySelector('.jspsych-survey-text textarea');
-                }
-                
-                console.log('Searching for input element...', inputElement ? 'FOUND!' : 'not found');
-                
-                if (inputElement && !inputElement.hasAttribute('data-paste-blocked')) {
-                    console.log('*** ATTACHING PASTE BLOCKING TO ELEMENT ***');
-                    console.log('Element type:', inputElement.tagName);
-                    console.log('Element name:', inputElement.name);
-                    
-                    // Mark it
-                    inputElement.setAttribute('data-paste-blocked', 'true');
-                    
-                    // Method 1: Block paste event
-                    inputElement.addEventListener('paste', function(e) {
-                        console.log('🚫 PASTE EVENT BLOCKED!');
+            };
+            
+            // Create global keyboard blocker
+            window.keydownBlockHandler = function(e) {
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V' || e.keyCode === 86)) {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                        console.log('🚫 GLOBAL CTRL/CMD+V BLOCKED!');
                         e.preventDefault();
                         e.stopImmediatePropagation();
-                        this.style.border = '3px solid red';
+                        e.target.style.border = '3px solid red';
                         setTimeout(() => {
-                            this.style.border = '';
+                            e.target.style.border = '';
                         }, 1000);
                         alert('Pasting is not allowed. Please type your answer.');
                         return false;
-                    }, {capture: true, passive: false});
-                    
-                    // Method 2: Block keyboard shortcuts
-                    inputElement.addEventListener('keydown', function(e) {
-                        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V' || e.keyCode === 86)) {
-                            console.log('🚫 CTRL/CMD+V BLOCKED!');
-                            e.preventDefault();
-                            e.stopImmediatePropagation();
-                            this.style.border = '3px solid red';
-                            setTimeout(() => {
-                                this.style.border = '';
-                            }, 1000);
-                            alert('Pasting is not allowed. Please type your answer.');
-                            return false;
-                        }
-                    }, {capture: true, passive: false});
-                    
-                    // Method 3: Input monitoring
-                    let lastValue = '';
-                    inputElement.addEventListener('input', function(e) {
-                        const currentValue = this.value;
-                        const added = currentValue.length - lastValue.length;
-                        
-                        if (added > 2) {
-                            console.log('🚫 RAPID INPUT DETECTED - BLOCKING!');
-                            this.value = lastValue;
-                            this.style.border = '3px solid red';
-                            setTimeout(() => {
-                                this.style.border = '';
-                            }, 1000);
-                            alert('Pasting is not allowed. Please type your answer.');
-                        }
-                        
-                        lastValue = this.value;
-                    });
-                    
-                    console.log('✅ All paste blocking attached successfully!');
-                    return true;
+                    }
                 }
-                return false;
             };
             
-            // Try immediately
-            if (findAndBlockPaste()) {
-                console.log('Immediate attachment successful');
-                return;
-            }
+            // Attach to document with capture phase
+            document.addEventListener('paste', window.pasteBlockHandler, true);
+            document.addEventListener('keydown', window.keydownBlockHandler, true);
             
-            // Use MutationObserver
-            let attached = false;
-            const observer = new MutationObserver(function(mutations) {
-                if (!attached && findAndBlockPaste()) {
-                    attached = true;
-                    observer.disconnect();
-                    console.log('MutationObserver attachment successful');
-                }
-            });
-            
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-            
-            // Also try with delays
-            const delays = [100, 200, 300, 500, 800, 1000];
-            delays.forEach(delay => {
-                setTimeout(() => {
-                    if (!attached) {
-                        console.log(`Retry attempt at ${delay}ms`);
-                        if (findAndBlockPaste()) {
-                            attached = true;
-                            observer.disconnect();
-                            console.log(`Attachment successful at ${delay}ms`);
-                        }
-                    }
-                }, delay);
-            });
+            console.log('✅ Global paste blocking active');
         },
         on_finish: function(data) {
+            // Clean up global listeners
+            if (window.pasteBlockHandler) {
+                document.removeEventListener('paste', window.pasteBlockHandler, true);
+                console.log('Removed global paste blocker');
+            }
+            if (window.keydownBlockHandler) {
+                document.removeEventListener('keydown', window.keydownBlockHandler, true);
+                console.log('Removed global keyboard blocker');
+            }
+            
             const guess = data.response.target_word_guess.toLowerCase().trim().replace(/[.,!?]/g, '');
             const correct = trial.target_word.toLowerCase().trim().replace(/[.,!?]/g, '');
             const isCorrect = guess === correct;
