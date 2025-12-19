@@ -182,6 +182,16 @@ function countRevealableWords(jabberTokens, realTokens, targetIndex) {
     return count;
 }
 
+// Function to generate a random string of specified length
+function generateRandomString(length) {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
+
 // Function to load and randomize CSV data
 function loadTrialData(sublistNum) {
     const csvFilename = `trial_list_sublist_${sublistNum}.csv`;
