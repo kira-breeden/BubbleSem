@@ -720,11 +720,12 @@ async function createTimeline(sublistNum) {
     timeline.push({
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function() {
+            const completion_code = generateRandomString(3) + 'zvz' + generateRandomString(3);
             // Get survey URL from URL parameter or use default
-            const surveyURL = getURLParameter('survey_url') || 'https://uwmadison.co1.qualtrics.com/jfe/form/SV_0VC8tugavHYnhoa';
+            const surveyURL = getURLParameter('survey_url') || 'https://uwmadison.co1.qualtrics.com/jfe/form/SV_6wWzCGdLI4A6SDY';
             // Add subjCode to survey URL
-            const surveyWithId = `${surveyURL}${surveyURL.includes('?') ? '&' : '?'}subjCode=${subjCode}`;
-            
+            const surveyWithParams = `${surveyURL}${surveyURL.includes('?') ? '&' : '?'}subjCode=${subjCode}&completionCode=${completion_code}`;
+
             const maxPossibleScore = trialData.length * 100;
             const scorePercentage = Math.round((totalScore / maxPossibleScore) * 100);
             
@@ -734,7 +735,7 @@ async function createTimeline(sublistNum) {
                     <p><strong>Total Score: ${totalScore} / ${maxPossibleScore} points (${scorePercentage}%)</strong></p>
                     <p>Please click the link below to complete the experiment. <strong> YOU WILL RECEIVE YOUR MTURK HIIT AT THE END OF THE SURVEY </strong></p>
                     <p style="margin-top: 30px;">
-                        <a href="${surveyWithId}" target="_blank" style="font-size: 18px; padding: 15px 30px; background-color: #2196f3; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        <a href="${surveyWithParams}" target="_blank" style="font-size: 18px; padding: 15px 30px; background-color: #2196f3; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">
                             Go to Survey
                         </a>
                     </p>
